@@ -808,8 +808,9 @@ function App() {
           <div className="navbar-brand" onClick={() => setPage('dashboard')} style={{ cursor: 'pointer' }}>
             <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
               <rect width="28" height="28" rx="8" fill="#6366f1"/>
-              <path d="M14 7c-1.5 0-2.8.6-3.7 1.6C9.3 9.6 8.5 11 8.5 13c0 3.5 5.5 8.5 5.5 8.5s5.5-5 5.5-8.5c0-2-.8-3.4-1.8-4.4C16.8 7.6 15.5 7 14 7z" fill="white" fillOpacity="0.9"/>
-              <circle cx="14" cy="12.5" r="2" fill="#6366f1"/>
+              <rect x="11.5" y="5" width="5" height="18" rx="1" fill="white" fillOpacity="0.9"/>
+              <rect x="5" y="11.5" width="18" height="5" rx="1" fill="white" fillOpacity="0.9"/>
+              <polyline points="7,18 11,14 14.5,17 17.5,10 21,13" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
             </svg>
             <div className="brand-text">
               <span className="brand-name">DataNurse</span>
