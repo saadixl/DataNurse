@@ -46,6 +46,10 @@ export function addReading(uid, reading) {
   return push(ref(db, `users/${uid}/readings`), reading)
 }
 
+export function updateReading(uid, readingId, data) {
+  return set(ref(db, `users/${uid}/readings/${readingId}`), data)
+}
+
 export function deleteReading(uid, readingId) {
   return remove(ref(db, `users/${uid}/readings/${readingId}`))
 }
