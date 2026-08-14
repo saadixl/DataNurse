@@ -188,7 +188,7 @@ function ReadingItem({ reading, onDelete, onEdit, targets }) {
       </span>
       <span className={`compact-value ${scoreClass}`}>
         {reading.type === 'bp'
-          ? <>{reading.systolic}/{reading.diastolic} <span className="reading-unit">mmHg</span>{reading.pulse ? <> · {reading.pulse} <span className="reading-unit">bpm</span></> : null}</>
+          ? <>{reading.systolic} / {reading.diastolic} <span className="reading-unit">mmHg</span>{reading.pulse ? <> · {reading.pulse} <span className="reading-unit">bpm</span></> : null}</>
           : <>{reading.glucose} <span className="reading-unit">mmol/L</span> · <span className="compact-meal">{mealLabels[reading.meal]}</span></>
         }
       </span>
