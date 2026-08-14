@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { loginWithGoogle, logout, onAuthChange, subscribeReadings, addReading, deleteReading, seedSampleData, subscribeTargets, saveTargets, deleteAllData } from './firebase'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Cell } from 'recharts'
+import { loginWithGoogle, logout, onAuthChange, subscribeReadings, addReading, updateReading, deleteReading, seedSampleData, subscribeTargets, saveTargets, deleteAllData } from './firebase'
+import { BarChart, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Cell } from 'recharts'
 import './App.css'
 
 function formatDate(iso) {
@@ -169,7 +169,7 @@ const mealLabels = {
   bedtime: 'Bedtime',
 }
 
-function ReadingItem({ reading, onDelete }) {
+function ReadingItem({ reading, onDelete, onEdit }) {
   return (
     <div className="reading-item">
       <div className="reading-row">
@@ -208,20 +208,123 @@ function ReadingItem({ reading, onDelete }) {
             </span>
           </div>
         </div>
-        <button className="delete-btn" onClick={() => onDelete(reading.id)} aria-label="Delete reading">
-          &times;
-        </button>
+        <div className="reading-actions">
+          <button className="edit-btn" onClick={() => onEdit(reading)} aria-label="Edit reading">
+            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M14.5 2.5a2.12 2.12 0 0 1 3 3L6 17l-4 1 1-4Z" />
+            </svg>
+          </button>
+          <button className="delete-btn" onClick={() => onDelete(reading.id)} aria-label="Delete reading">
+            &times;
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function EditReadingModal({ reading, onSave, onClose }) {
+  const isBp = reading.type === 'bp'
+  const [systolic, setSystolic] = useState(isBp ? reading.systolic : '')
+  const [diastolic, setDiastolic] = useState(isBp ? reading.diastolic : '')
+  const [pulse, setPulse] = useState(isBp && reading.pulse ? reading.pulse : '')
+  const [glucose, setGlucose] = useState(!isBp ? reading.glucose : '')
+  const [meal, setMeal] = useState(!isBp ? reading.meal : 'fasting')
+  const [datetime, setDatetime] = useState(toLocalDatetime(reading.timestamp))
+  const [notes, setNotes] = useState(reading.notes || '')
+  const [saving, setSaving] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setSaving(true)
+    const updated = isBp
+      ? { type: 'bp', systolic: Number(systolic), diastolic: Number(diastolic), pulse: pulse ? Number(pulse) : null, notes: notes.trim(), timestamp: new Date(datetime).toISOString() }
+      : { type: 'glucose', glucose: Number(glucose), meal, notes: notes.trim(), timestamp: new Date(datetime).toISOString() }
+    await onSave(reading.id, updated)
+    setSaving(false)
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3>Edit {isBp ? 'Blood Pressure' : 'Glucose'} Reading</h3>
+          <button className="modal-close" onClick={onClose}>&times;</button>
+        </div>
+        <form onSubmit={handleSubmit}>
+          {isBp ? (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Systolic (mmHg)</label>
+                  <input type="number" value={systolic} onChange={e => setSystolic(e.target.value)} min="60" max="300" required />
+                </div>
+                <div className="form-group">
+                  <label>Diastolic (mmHg)</label>
+                  <input type="number" value={diastolic} onChange={e => setDiastolic(e.target.value)} min="30" max="200" required />
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Pulse (bpm, optional)</label>
+                  <input type="number" value={pulse} onChange={e => setPulse(e.target.value)} min="30" max="250" />
+                </div>
+                <div className="form-group">
+                  <label>Date & Time</label>
+                  <input type="datetime-local" value={datetime} onChange={e => setDatetime(e.target.value)} />
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Glucose (mmol/L)</label>
+                  <input type="number" value={glucose} onChange={e => setGlucose(e.target.value)} min="0.5" max="35" step="0.1" required />
+                </div>
+                <div className="form-group">
+                  <label>Meal Context</label>
+                  <select value={meal} onChange={e => setMeal(e.target.value)}>
+                    <option value="fasting">Fasting</option>
+                    <option value="before_meal">Before Meal</option>
+                    <option value="after_meal">After Meal</option>
+                    <option value="bedtime">Bedtime</option>
+                  </select>
+                </div>
+              </div>
+              <div className="form-row">
+                <div className="form-group">
+                  <label>Date & Time</label>
+                  <input type="datetime-local" value={datetime} onChange={e => setDatetime(e.target.value)} />
+                </div>
+                <div className="form-group" />
+              </div>
+            </>
+          )}
+          <div className="form-row">
+            <div className="form-group full-width">
+              <label>Notes (optional)</label>
+              <input type="text" value={notes} onChange={e => setNotes(e.target.value)} maxLength={100} />
+            </div>
+          </div>
+          <div className="modal-actions">
+            <button type="button" className="btn-cancel" onClick={onClose}>Cancel</button>
+            <button type="submit" className="btn btn-primary" disabled={saving}>
+              {saving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   )
 }
 
 const chartTooltipStyle = {
-  backgroundColor: '#1e2130',
-  border: '1px solid #2e3248',
+  backgroundColor: '#f9fafb',
+  border: '1px solid #d1d5db',
   borderRadius: '8px',
   fontSize: '12px',
-  color: '#e8eaed',
+  color: '#111827',
 }
 
 function BPChart({ readings, targets }) {
@@ -327,6 +430,59 @@ function GlucoseChart({ readings, targets }) {
               <ReferenceLine y={targets.glucose} stroke="#f87171" strokeDasharray="6 4" strokeWidth={1.5} label={{ value: `Target ${targets.glucose}`, fill: '#f87171', fontSize: 10, position: 'right' }} />
             )}
           </BarChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
+function CombinedChart({ readings, targets }) {
+  const data = useMemo(() => {
+    const byDay = {}
+    readings.forEach(r => {
+      const day = new Date(r.timestamp).toDateString()
+      if (!byDay[day]) byDay[day] = { systolics: [], diastolics: [], glucoses: [], timestamp: r.timestamp }
+      if (r.type === 'bp') {
+        byDay[day].systolics.push(r.systolic)
+        byDay[day].diastolics.push(r.diastolic)
+      } else if (r.type === 'glucose') {
+        byDay[day].glucoses.push(r.glucose)
+      }
+    })
+    return Object.entries(byDay)
+      .map(([, v]) => ({
+        date: formatShortDate(v.timestamp),
+        sortKey: new Date(v.timestamp).getTime(),
+        Systolic: v.systolics.length ? Math.round(v.systolics.reduce((a, b) => a + b, 0) / v.systolics.length) : null,
+        Diastolic: v.diastolics.length ? Math.round(v.diastolics.reduce((a, b) => a + b, 0) / v.diastolics.length) : null,
+        Glucose: v.glucoses.length ? +(v.glucoses.reduce((a, b) => a + b, 0) / v.glucoses.length).toFixed(1) : null,
+      }))
+      .sort((a, b) => a.sortKey - b.sortKey)
+      .slice(-14)
+  }, [readings])
+
+  if (data.length === 0) return <div className="chart-empty">No data to chart</div>
+
+  return (
+    <div className="chart-card">
+      <h3 className="chart-title">
+        <span className="dot dot-bp" />
+        <span className="dot dot-bg" />
+        Combined — Last 14 days
+      </h3>
+      <div className="chart-wrap">
+        <ResponsiveContainer width="100%" height={280}>
+          <ComposedChart data={data} barGap={2} barCategoryGap="20%">
+            <CartesianGrid strokeDasharray="3 3" stroke="#2e3248" vertical={false} />
+            <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={{ stroke: '#2e3248' }} tickLine={false} />
+            <YAxis yAxisId="bp" domain={[40, 'auto']} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={35} />
+            <YAxis yAxisId="glucose" orientation="right" domain={[0, 'auto']} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={40} unit=" mmol/L" />
+            <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'rgba(99,102,241,0.08)' }} formatter={(value, name) => name === 'Glucose' ? [`${value} mmol/L`, name] : [`${value} mmHg`, name]} />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: '#9ca3af' }} />
+            <Bar yAxisId="bp" dataKey="Systolic" fill="#818cf8" radius={[4, 4, 0, 0]} />
+            <Bar yAxisId="bp" dataKey="Diastolic" fill="#6366f1" radius={[4, 4, 0, 0]} />
+            <Line yAxisId="glucose" type="monotone" dataKey="Glucose" stroke="#34d399" strokeWidth={2.5} dot={{ fill: '#34d399', r: 3 }} activeDot={{ r: 5 }} connectNulls />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
     </div>
@@ -733,6 +889,7 @@ function App() {
   const [readings, setReadings] = useState([])
   const [targets, setTargets] = useState({})
   const [dataLoading, setDataLoading] = useState(true)
+  const [editingReading, setEditingReading] = useState(null)
   const { toasts, show: showToast } = useToast()
 
   useEffect(() => {
@@ -768,6 +925,12 @@ function App() {
   async function handleAddReading(reading) {
     await addReading(user.uid, reading)
     showToast(reading.type === 'bp' ? 'Blood pressure reading added' : 'Glucose reading added')
+  }
+
+  async function handleUpdateReading(id, data) {
+    await updateReading(user.uid, id, data)
+    setEditingReading(null)
+    showToast('Reading updated')
   }
 
   async function handleDeleteReading(id) {
@@ -809,6 +972,13 @@ function App() {
   return (
     <div className="app-shell">
       <Toast toasts={toasts} />
+      {editingReading && (
+        <EditReadingModal
+          reading={editingReading}
+          onSave={handleUpdateReading}
+          onClose={() => setEditingReading(null)}
+        />
+      )}
       <header className="navbar">
         <div className="navbar-inner">
           <div className="navbar-brand" onClick={() => setPage('dashboard')} style={{ cursor: 'pointer' }}>
@@ -881,7 +1051,7 @@ function App() {
                     </div>
                   ) : (
                     filtered.map(r => (
-                      <ReadingItem key={r.id} reading={r} onDelete={handleDeleteReading} />
+                      <ReadingItem key={r.id} reading={r} onDelete={handleDeleteReading} onEdit={setEditingReading} />
                     ))
                   )}
                 </div>
@@ -895,12 +1065,14 @@ function App() {
                 <SkeletonStatCards />
                 <SkeletonChart />
                 <SkeletonChart />
+                <SkeletonChart />
               </>
             ) : (
               <>
                 <StatCards readings={readings} targets={targets} />
                 <BPChart readings={readings} targets={targets} />
                 <GlucoseChart readings={readings} targets={targets} />
+                <CombinedChart readings={readings} targets={targets} />
               </>
             )}
           </div>
