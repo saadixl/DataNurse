@@ -169,55 +169,40 @@ const mealLabels = {
   bedtime: 'Bedtime',
 }
 
-function ReadingItem({ reading, onDelete, onEdit }) {
+function getReadingScoreClass(reading, targets) {
+  if (reading.type === 'bp') {
+    if (!targets.bpEnabled || !targets.systolic || !targets.diastolic) return ''
+    return reading.systolic <= targets.systolic && reading.diastolic <= targets.diastolic
+      ? 'score-good' : 'score-bad'
+  }
+  if (!targets.glucoseEnabled || !targets.glucose) return ''
+  return reading.glucose <= targets.glucose ? 'score-good' : 'score-bad'
+}
+
+function ReadingItem({ reading, onDelete, onEdit, targets }) {
+  const scoreClass = getReadingScoreClass(reading, targets)
   return (
-    <div className="reading-item">
-      <div className="reading-row">
-        <div className="reading-content">
-          <div className="reading-values">
-            {reading.type === 'bp' ? (
-              <>
-                <div className="reading-main">
-                  {reading.systolic}/{reading.diastolic}
-                  <span className="reading-unit"> mmHg</span>
-                </div>
-                {reading.pulse && (
-                  <div className="reading-unit">{reading.pulse} bpm</div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="reading-main">
-                  {reading.glucose}
-                  <span className="reading-unit"> mmol/L</span>
-                </div>
-                <span className="reading-tag tag-bg">
-                  {mealLabels[reading.meal]}
-                </span>
-              </>
-            )}
-            {reading.notes && (
-              <div className="notes-text">{reading.notes}</div>
-            )}
-          </div>
-          <div className="reading-meta">
-            <span className="reading-date">{formatDate(reading.timestamp)}</span>
-            <span className="reading-time">{formatTime(reading.timestamp)}</span>
-            <span className={`reading-tag ${reading.type === 'bp' ? 'tag-bp' : 'tag-bg'}`}>
-              {reading.type === 'bp' ? 'BP' : 'Glucose'}
-            </span>
-          </div>
-        </div>
-        <div className="reading-actions">
-          <button className="edit-btn" onClick={() => onEdit(reading)} aria-label="Edit reading">
-            <svg width="14" height="14" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M14.5 2.5a2.12 2.12 0 0 1 3 3L6 17l-4 1 1-4Z" />
-            </svg>
-          </button>
-          <button className="delete-btn" onClick={() => onDelete(reading.id)} aria-label="Delete reading">
-            &times;
-          </button>
-        </div>
+    <div className="reading-item-compact">
+      <span className={`compact-tag ${reading.type === 'bp' ? 'tag-bp' : 'tag-bg'}`}>
+        {reading.type === 'bp' ? 'BP' : 'BG'}
+      </span>
+      <span className={`compact-value ${scoreClass}`}>
+        {reading.type === 'bp'
+          ? <>{reading.systolic}/{reading.diastolic} <span className="reading-unit">mmHg</span>{reading.pulse ? <> · {reading.pulse} <span className="reading-unit">bpm</span></> : null}</>
+          : <>{reading.glucose} <span className="reading-unit">mmol/L</span> · <span className="compact-meal">{mealLabels[reading.meal]}</span></>
+        }
+      </span>
+      {reading.notes && <span className="compact-notes" title={reading.notes}>{reading.notes}</span>}
+      <span className="compact-date">{formatShortDate(reading.timestamp)} {formatTime(reading.timestamp)}</span>
+      <div className="reading-actions-compact">
+        <button className="edit-btn" onClick={() => onEdit(reading)} aria-label="Edit reading">
+          <svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M14.5 2.5a2.12 2.12 0 0 1 3 3L6 17l-4 1 1-4Z" />
+          </svg>
+        </button>
+        <button className="delete-btn" onClick={() => onDelete(reading.id)} aria-label="Delete reading">
+          &times;
+        </button>
       </div>
     </div>
   )
@@ -890,6 +875,7 @@ function App() {
   const [targets, setTargets] = useState({})
   const [dataLoading, setDataLoading] = useState(true)
   const [editingReading, setEditingReading] = useState(null)
+  const [formCollapsed, setFormCollapsed] = useState(false)
   const { toasts, show: showToast } = useToast()
 
   useEffect(() => {
@@ -1030,8 +1016,17 @@ function App() {
               </button>
             </div>
 
-            {tab === 'bp' && <BloodPressureForm onAdd={handleAddReading} />}
-            {tab === 'glucose' && <BloodGlucoseForm onAdd={handleAddReading} />}
+            {tab !== 'all' && (
+              <div className="form-collapse-container">
+                <button className="form-collapse-toggle" onClick={() => setFormCollapsed(c => !c)}>
+                  <span>{formCollapsed ? 'Show' : 'Hide'} {tab === 'bp' ? 'BP' : 'Glucose'} Form</span>
+                  <span className={`collapse-chevron ${formCollapsed ? 'collapsed' : ''}`}>&#9650;</span>
+                </button>
+                {!formCollapsed && (
+                  tab === 'bp' ? <BloodPressureForm onAdd={handleAddReading} /> : <BloodGlucoseForm onAdd={handleAddReading} />
+                )}
+              </div>
+            )}
 
             {dataLoading ? <SkeletonReadings /> : (
               <div className="readings-card">
@@ -1051,7 +1046,7 @@ function App() {
                     </div>
                   ) : (
                     filtered.map(r => (
-                      <ReadingItem key={r.id} reading={r} onDelete={handleDeleteReading} onEdit={setEditingReading} />
+                      <ReadingItem key={r.id} reading={r} onDelete={handleDeleteReading} onEdit={setEditingReading} targets={targets} />
                     ))
                   )}
                 </div>
