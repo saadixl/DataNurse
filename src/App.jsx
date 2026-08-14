@@ -619,6 +619,12 @@ function LoginScreen() {
   return (
     <div className="login-screen">
       <div className="login-card">
+        <svg width="56" height="56" viewBox="0 0 28 28" fill="none" className="login-logo">
+          <rect width="28" height="28" rx="8" fill="#6366f1"/>
+          <rect x="11.5" y="5" width="5" height="18" rx="1" fill="white" fillOpacity="0.9"/>
+          <rect x="5" y="11.5" width="18" height="5" rx="1" fill="white" fillOpacity="0.9"/>
+          <polyline points="7,18 11,14 14.5,17 17.5,10 21,13" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
         <h1>DataNurse</h1>
         <p>Health Monitoring System</p>
         <button className="btn btn-google" onClick={handleLogin} disabled={loading}>
