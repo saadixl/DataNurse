@@ -860,6 +860,10 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   width: 100%;
 }
 
+.login-logo {
+  margin-bottom: 16px;
+}
+
 .login-card h1 {
   font-size: 36px;
   font-weight: 700;
