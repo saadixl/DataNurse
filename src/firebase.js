@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from "firebase/app"
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "firebase/auth"
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged } from "firebase/auth"
 import { getDatabase, ref, push, remove, set, onValue, query, orderByChild } from "firebase/database"
 
 const firebaseConfig = {
@@ -19,6 +19,11 @@ const db = getDatabase(app)
 const googleProvider = new GoogleAuthProvider()
 
 export function loginWithGoogle() {
+  const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) ||
+    (navigator.userAgent.includes('Macintosh') && 'ontouchend' in document)
+  if (isMobile) {
+    return signInWithRedirect(auth, googleProvider)
+  }
   return signInWithPopup(auth, googleProvider)
 }
 
