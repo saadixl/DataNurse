@@ -15,7 +15,7 @@ import {
   MAX_MEDICATION_EXTRAS, FREQUENCIES, MEAL_TIMINGS, slotsFor, slotLabel, mealLabel, frequencyLabel,
   dayKey, logKey, todayProgress, progressState, medicationStats,
 } from './medications'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Cell } from 'recharts'
+import { BarChart, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Cell } from 'recharts'
 import './App.css'
 
 const DEFINITION_COLORS = ['#f59e0b', '#38bdf8', '#a78bfa', '#2dd4bf', '#4ade80', '#facc15']
@@ -495,6 +495,104 @@ function ReadingChart({ readings, definition }) {
   )
 }
 
+// Daily averages for one definition's numeric fields, keyed with a prefix so
+// two definitions can share a chart without their field keys colliding.
+function collectDailyValues(byDay, definition, readings, prefix) {
+  readings.forEach(r => {
+    const day = new Date(r.timestamp).toDateString()
+    if (!byDay[day]) byDay[day] = { timestamp: r.timestamp, values: {} }
+    numericFields(definition).forEach(f => {
+      const v = getFieldValue(r, definition, f)
+      if (typeof v === 'number' && Number.isFinite(v)) {
+        (byDay[day].values[prefix + f.key] ||= []).push(v)
+      }
+    })
+  })
+}
+
+// The host definition as bars against a correlated one as a line, on twin axes
+// so the two scales stay readable.
+function CorrelationChart({ base, other, readingsByDefinition }) {
+  const baseFields = numericFields(base)
+  const otherFields = numericFields(other)
+
+  const data = useMemo(() => {
+    const byDay = {}
+    collectDailyValues(byDay, base, readingsByDefinition[base.id] || [], 'a_')
+    collectDailyValues(byDay, other, readingsByDefinition[other.id] || [], 'b_')
+    return Object.values(byDay)
+      .map(day => {
+        const point = { date: formatShortDate(day.timestamp), sortKey: new Date(day.timestamp).getTime() }
+        const avg = (key) => {
+          const vals = day.values[key]
+          return vals?.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : null
+        }
+        baseFields.forEach(f => { point['a_' + f.key] = avg('a_' + f.key) })
+        otherFields.forEach(f => { point['b_' + f.key] = avg('b_' + f.key) })
+        return point
+      })
+      .sort((a, b) => a.sortKey - b.sortKey)
+      .slice(-14)
+  }, [base, other, readingsByDefinition, baseFields, otherFields])
+
+  if (baseFields.length === 0 || otherFields.length === 0) {
+    return (
+      <div className="chart-empty">
+        {base.name} and {other.name} both need a number field to be compared.
+      </div>
+    )
+  }
+  if (data.length === 0) {
+    return <div className="chart-empty">No data to compare {base.name} with {other.name}</div>
+  }
+
+  return (
+    <div className="chart-card">
+      <h3 className="chart-title">
+        <span className="dot" style={{ background: base.chartColor || base.color || 'var(--accent)' }} />
+        <span className="dot" style={{ background: other.chartColor || other.color || 'var(--accent)' }} />
+        {base.name} vs {other.name}
+      </h3>
+      <div className="chart-wrap">
+        <ResponsiveContainer width="100%" height={260}>
+          <ComposedChart data={data} barGap={2} barCategoryGap="20%">
+            <CartesianGrid strokeDasharray="3 3" stroke="#2e3248" vertical={false} />
+            <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={{ stroke: '#2e3248' }} tickLine={false} />
+            <YAxis yAxisId="base" domain={[0, 'auto']} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={38} />
+            <YAxis yAxisId="other" orientation="right" domain={[0, 'auto']} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={38} />
+            <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'rgba(99,102,241,0.08)' }} />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: '#9ca3af' }} />
+            {baseFields.map((f, i) => (
+              <Bar
+                key={f.key}
+                yAxisId="base"
+                dataKey={'a_' + f.key}
+                name={f.label}
+                fill={fieldColor(base, i)}
+                radius={[4, 4, 0, 0]}
+              />
+            ))}
+            {otherFields.map((f, i) => (
+              <Line
+                key={f.key}
+                yAxisId="other"
+                type="monotone"
+                dataKey={'b_' + f.key}
+                name={`${other.name} ${f.label}`}
+                stroke={fieldColor(other, i)}
+                strokeWidth={2.5}
+                dot={{ r: 3 }}
+                activeDot={{ r: 5 }}
+                connectNulls
+              />
+            ))}
+          </ComposedChart>
+        </ResponsiveContainer>
+      </div>
+    </div>
+  )
+}
+
 /* ---------- Reading type builder ---------- */
 
 const blankBuilderField = () => ({
@@ -713,15 +811,66 @@ function DefinitionForm({ definition, definitions, onSubmit, onCancel }) {
 
 // Settings sub-tab: list the user's reading types, toggle them on or off, and
 // add or edit one in place.
-function ReadingTypesSettings({ definitions, counts, onCreate, onUpdate, onDelete, onToggle, openAddAt }) {
+// Multi-select of the other reading types to chart this one against.
+function CorrelationPicker({ definition, options, onChange }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const selected = definition.correlations || []
+
+  useEffect(() => {
+    if (!open) return
+    const onDown = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const onKey = e => { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('mousedown', onDown)
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('mousedown', onDown)
+      document.removeEventListener('keydown', onKey)
+    }
+  }, [open])
+
+  function toggle(id) {
+    onChange(definition, selected.includes(id)
+      ? selected.filter(x => x !== id)
+      : [...selected, id])
+  }
+
+  const label = selected.length === 0
+    ? 'Correlations'
+    : selected.length === 1
+      ? (options.find(o => o.id === selected[0])?.name || '1 selected')
+      : `${selected.length} selected`
+
+  return (
+    <span className="corr-picker" ref={ref}>
+      <button
+        type="button"
+        className={`corr-trigger ${selected.length ? 'corr-active' : ''}`}
+        onClick={() => setOpen(o => !o)}
+        disabled={options.length === 0}
+        title={options.length === 0 ? 'Add another reading type to compare against' : 'Compare against other readings'}
+      >
+        {label}
+        <span className="corr-caret">&#9662;</span>
+      </button>
+      {open && (
+        <span className="corr-menu">
+          {options.map(o => (
+            <label className="corr-option" key={o.id}>
+              <input type="checkbox" checked={selected.includes(o.id)} onChange={() => toggle(o.id)} />
+              <span className="dot" style={{ background: o.color || 'var(--accent)' }} />
+              {o.name}
+            </label>
+          ))}
+        </span>
+      )}
+    </span>
+  )
+}
+
+function ReadingTypesSettings({ definitions, counts, onCreate, onUpdate, onDelete, onToggle, onSetCorrelations }) {
   const [mode, setMode] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
-
-  // Bumped by the navbar's create button; a counter rather than a flag so the
-  // form reopens even when this page is already showing.
-  useEffect(() => {
-    if (openAddAt) setMode('add')
-  }, [openAddAt])
 
   const editing = definitions.find(d => d.id === mode)
   const formOpen = mode === 'add' || !!editing
@@ -767,6 +916,11 @@ function ReadingTypesSettings({ definitions, counts, onCreate, onUpdate, onDelet
                     <span className="dot" style={{ background: d.color || 'var(--accent)' }} />
                     <span className="definition-name">{d.name}</span>
                     <span className="definition-fields">{(d.fields || []).map(f => f.label).join(' · ')}</span>
+                    <CorrelationPicker
+                      definition={d}
+                      options={definitions.filter(o => o.id !== d.id)}
+                      onChange={onSetCorrelations}
+                    />
                     {pendingDelete === d.id ? (
                       <span className="confirm-group">
                         <button className="btn-danger btn-tiny" onClick={() => { onDelete(d); setPendingDelete(null) }}>
@@ -929,13 +1083,9 @@ function MedicationForm({ medication, medications, onSubmit, onCancel }) {
   )
 }
 
-function MedicationsSettings({ medications, onCreate, onUpdate, onDelete, onToggle, openAddAt }) {
+function MedicationsSettings({ medications, onCreate, onUpdate, onDelete, onToggle }) {
   const [mode, setMode] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
-
-  useEffect(() => {
-    if (openAddAt) setMode('add')
-  }, [openAddAt])
 
   const editing = medications.find(m => m.id === mode)
   const formOpen = mode === 'add' || !!editing
@@ -1169,7 +1319,7 @@ function DataSettings({ onDeleteData, onSeedData }) {
               <div className="danger-action">
                 <div>
                   <div className="danger-label">Load sample data</div>
-                  <div className="danger-desc">Generate 1 month of sample blood pressure and glucose readings.</div>
+                  <div className="danger-desc">Generate a month of readings across four types, plus three medications with dose history.</div>
                 </div>
                 <button className="btn-danger-outline btn-neutral-outline" onClick={onSeedData}>Load Sample Data</button>
               </div>
@@ -1178,7 +1328,7 @@ function DataSettings({ onDeleteData, onSeedData }) {
               <div className="danger-action">
                 <div>
                   <div className="danger-label">Delete all readings</div>
-                  <div className="danger-desc">Remove every reading. Your reading types are kept. This cannot be undone.</div>
+                  <div className="danger-desc">Remove every reading and dose log. Your reading types and medications are kept. This cannot be undone.</div>
                 </div>
                 {confirmDelete ? (
                   <div className="confirm-group">
@@ -1493,7 +1643,6 @@ function App() {
   const [editingReading, setEditingReading] = useState(null)
   const [formCollapsed, setFormCollapsed] = useState(false)
   const { toasts, show: showToast } = useToast()
-  const [newTypeRequest, setNewTypeRequest] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const seedingRef = useRef(false)
 
@@ -1585,6 +1734,23 @@ function App() {
     [enabledDefinitions, readings]
   )
 
+  // One chart per (host, correlated) pair, skipping partners that are gone,
+  // switched off, or have nothing recorded yet.
+  const correlationPairs = useMemo(() => {
+    const withData = new Set(
+      enabledDefinitions.filter(d => readings.some(r => readingDefinitionId(r) === d.id)).map(d => d.id)
+    )
+    const pairs = []
+    definitions.forEach(base => {
+      if (!base.enabled || !withData.has(base.id)) return
+      ;(base.correlations || []).forEach(otherId => {
+        const other = definitions.find(d => d.id === otherId)
+        if (other?.enabled && withData.has(otherId)) pairs.push({ base, other })
+      })
+    })
+    return pairs
+  }, [definitions, enabledDefinitions, readings])
+
   const readingsByDefinition = useMemo(() => {
     const grouped = {}
     visibleReadings.forEach(r => {
@@ -1618,12 +1784,6 @@ function App() {
 
   function handleSelectPage(next) {
     setPage(next)
-    setMenuOpen(false)
-  }
-
-  function handleCreateNewReadingType() {
-    setPage('settings:readings')
-    setNewTypeRequest(n => n + 1)
     setMenuOpen(false)
   }
 
@@ -1669,6 +1829,11 @@ function App() {
     showToast(`${definition.name} ${enabled ? 'shown' : 'hidden'}`, enabled ? 'success' : 'error')
   }
 
+  async function handleSetCorrelations(definition, correlations) {
+    const { id, ...stored } = definition
+    await updateDefinition(user.uid, id, { ...stored, correlations })
+  }
+
   async function handleDeleteDefinition(definition) {
     const orphaned = readings.filter(r => readingDefinitionId(r) === definition.id)
     await Promise.all(orphaned.map(r => deleteReading(user.uid, r.id)))
@@ -1712,7 +1877,7 @@ function App() {
 
   async function handleDeleteAllData() {
     await deleteAllData(user.uid)
-    showToast('All readings deleted', 'error')
+    showToast('All readings and dose logs deleted', 'error')
   }
 
   async function handleSeedData() {
@@ -1756,25 +1921,19 @@ function App() {
             <button className="nav-menu-btn" onClick={() => setMenuOpen(true)} aria-label="Open navigation">
               <MenuIcon />
             </button>
-          <div className="navbar-brand" onClick={() => handleSelectPage('all')} style={{ cursor: 'pointer' }}>
-            <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-              <rect width="28" height="28" rx="8" fill="#6366f1"/>
-              <rect x="11.5" y="5" width="5" height="18" rx="1" fill="white" fillOpacity="0.9"/>
-              <rect x="5" y="11.5" width="18" height="5" rx="1" fill="white" fillOpacity="0.9"/>
-              <polyline points="7,18 11,14 14.5,17 17.5,10 21,13" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-            <div className="brand-text">
-              <span className="brand-name">DataNurse</span>
-              <span className="brand-tagline">Health Monitoring System</span>
+            <div className="navbar-brand" onClick={() => handleSelectPage('all')} style={{ cursor: 'pointer' }}>
+              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+                <rect width="28" height="28" rx="8" fill="#6366f1"/>
+                <rect x="11.5" y="5" width="5" height="18" rx="1" fill="white" fillOpacity="0.9"/>
+                <rect x="5" y="11.5" width="18" height="5" rx="1" fill="white" fillOpacity="0.9"/>
+                <polyline points="7,18 11,14 14.5,17 17.5,10 21,13" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+              </svg>
+              <div className="brand-text">
+                <span className="brand-name">DataNurse</span>
+                <span className="brand-tagline">Health Monitoring System</span>
+              </div>
             </div>
           </div>
-          </div>
-          <button className="btn-create" onClick={handleCreateNewReadingType}>
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <path d="M10 4v12M4 10h12" />
-            </svg>
-            Create new readings
-          </button>
         </div>
       </header>
 
@@ -1801,7 +1960,7 @@ function App() {
                 onUpdate={handleUpdateDefinition}
                 onDelete={handleDeleteDefinition}
                 onToggle={handleToggleDefinition}
-                openAddAt={newTypeRequest}
+                onSetCorrelations={handleSetCorrelations}
               />
             )}
             {settingsPage === 'medications' && (
@@ -1811,7 +1970,6 @@ function App() {
                 onUpdate={handleUpdateMedication}
                 onDelete={handleDeleteMedication}
                 onToggle={handleToggleMedication}
-                openAddAt={0}
               />
             )}
             {settingsPage === 'data' && (
@@ -1909,6 +2067,14 @@ function App() {
                 <div className="chart-grid">
                   {definitionsWithReadings.map(d => (
                     <ReadingChart key={d.id} definition={d} readings={readingsByDefinition[d.id] || []} />
+                  ))}
+                  {correlationPairs.map(({ base, other }) => (
+                    <CorrelationChart
+                      key={`${base.id}-${other.id}`}
+                      base={base}
+                      other={other}
+                      readingsByDefinition={readingsByDefinition}
+                    />
                   ))}
                 </div>
                 <ReadingsCard
