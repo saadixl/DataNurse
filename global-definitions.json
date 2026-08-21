@@ -1,0 +1,111 @@
+{
+  "bp": {
+    "name": "Blood Pressure",
+    "shortName": "BP",
+    "color": "#f87171",
+    "chartColor": "#818cf8",
+    "storage": "flat",
+    "builtIn": true,
+    "enabled": true,
+    "order": 1,
+    "fields": [
+      {
+        "key": "systolic",
+        "label": "Systolic",
+        "type": "number",
+        "unit": "mmHg",
+        "required": true,
+        "min": 60,
+        "max": 300,
+        "step": 1,
+        "avgEnabled": true,
+        "avgDays": 7,
+        "targetEnabled": true,
+        "target": 120,
+        "targetDirection": "max",
+        "joinWithNext": "/"
+      },
+      {
+        "key": "diastolic",
+        "label": "Diastolic",
+        "type": "number",
+        "unit": "mmHg",
+        "required": true,
+        "min": 30,
+        "max": 200,
+        "step": 1,
+        "avgEnabled": true,
+        "avgDays": 7,
+        "targetEnabled": true,
+        "target": 80,
+        "targetDirection": "max"
+      },
+      {
+        "key": "pulse",
+        "label": "Pulse",
+        "type": "number",
+        "unit": "bpm",
+        "required": false,
+        "min": 30,
+        "max": 250,
+        "step": 1,
+        "avgEnabled": false,
+        "avgDays": 7,
+        "targetEnabled": false,
+        "target": null,
+        "targetDirection": "max"
+      }
+    ]
+  },
+  "glucose": {
+    "name": "Blood Glucose",
+    "shortName": "BG",
+    "color": "#34d399",
+    "chartColor": "#34d399",
+    "storage": "flat",
+    "builtIn": true,
+    "enabled": true,
+    "order": 2,
+    "fields": [
+      {
+        "key": "glucose",
+        "label": "Glucose",
+        "type": "number",
+        "unit": "mmol/L",
+        "required": true,
+        "min": 1,
+        "max": 35,
+        "step": 0.1,
+        "avgEnabled": true,
+        "avgDays": 7,
+        "targetEnabled": true,
+        "target": 5.5,
+        "targetDirection": "max"
+      },
+      {
+        "key": "meal",
+        "label": "Meal Context",
+        "type": "select",
+        "required": true,
+        "options": [
+          {
+            "value": "fasting",
+            "label": "Fasting"
+          },
+          {
+            "value": "before_meal",
+            "label": "Before Meal"
+          },
+          {
+            "value": "after_meal",
+            "label": "After Meal"
+          },
+          {
+            "value": "bedtime",
+            "label": "Bedtime"
+          }
+        ]
+      }
+    ]
+  }
+}

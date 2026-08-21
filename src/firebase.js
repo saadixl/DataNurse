@@ -1,6 +1,8 @@
 import { initializeApp, getApps, getApp } from "firebase/app"
 import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged } from "firebase/auth"
-import { getDatabase, ref, push, remove, set, onValue, query, orderByChild } from "firebase/database"
+import { getDatabase, ref, push, remove, set, update, get, onValue, query, orderByChild } from "firebase/database"
+import { GLOBAL_DEFINITIONS, normalizeDefinition } from "./definitions"
+import { normalizeMedication, logKey } from "./medications"
 
 const firebaseConfig = {
   apiKey: "AIzaSyBM3xz7rh-qN-_LyUqJBF1LoXy94klFOec",
@@ -59,22 +61,122 @@ export function deleteReading(uid, readingId) {
   return remove(ref(db, `users/${uid}/readings/${readingId}`))
 }
 
-export function subscribeTargets(uid, callback) {
-  return onValue(ref(db, `users/${uid}/targets`), snapshot => {
+export function subscribeDefinitions(uid, callback) {
+  return onValue(ref(db, `users/${uid}/reading-definitions`), snapshot => {
+    const definitions = []
+    snapshot.forEach(child => {
+      const def = normalizeDefinition(child.key, child.val())
+      if (def) definitions.push(def)
+    })
+    definitions.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+    callback(definitions)
+  })
+}
+
+export function addDefinition(uid, definition) {
+  return push(ref(db, `users/${uid}/reading-definitions`), definition)
+}
+
+export function updateDefinition(uid, definitionId, definition) {
+  return set(ref(db, `users/${uid}/reading-definitions/${definitionId}`), definition)
+}
+
+export function deleteDefinition(uid, definitionId) {
+  return remove(ref(db, `users/${uid}/reading-definitions/${definitionId}`))
+}
+
+// Built-in reading types shared by every user. Falls back to the bundled copy
+// so the app still works if /global-definitions has not been seeded yet.
+// Ids of global definitions already copied to this user. Recorded separately
+// from the copies themselves so deleting a copy does not bring it back on the
+// next login — only genuinely new global types get seeded.
+export async function getSeededDefinitionIds(uid) {
+  const snapshot = await get(ref(db, `users/${uid}/seeded-definitions`))
+  return snapshot.exists() ? Object.keys(snapshot.val()) : []
+}
+
+// Writes each copy at the global definition's own key so readings already
+// stored under that type keep resolving to it.
+export function seedUserDefinitions(uid, definitions) {
+  const now = new Date().toISOString()
+  const updates = {}
+  definitions.forEach(definition => {
+    const { id, ...value } = definition
+    updates[`users/${uid}/reading-definitions/${id}`] = { ...value, sourceId: id, seededAt: now }
+    updates[`users/${uid}/seeded-definitions/${id}`] = now
+  })
+  return update(ref(db), updates)
+}
+
+export function subscribeGlobalDefinitions(callback) {
+  return onValue(ref(db, "global-definitions"), snapshot => {
+    const raw = snapshot.val() || GLOBAL_DEFINITIONS
+    const definitions = Object.keys(raw)
+      .map(id => normalizeDefinition(id, raw[id]))
+      .filter(Boolean)
+      .sort((a, b) => (a.order || 99) - (b.order || 99))
+    callback(definitions)
+  }, () => {
+    callback(Object.keys(GLOBAL_DEFINITIONS)
+      .map(id => normalizeDefinition(id, GLOBAL_DEFINITIONS[id]))
+      .sort((a, b) => (a.order || 99) - (b.order || 99)))
+  })
+}
+
+export function subscribeMedications(uid, callback) {
+  return onValue(ref(db, `users/${uid}/medications`), snapshot => {
+    const medications = []
+    snapshot.forEach(child => {
+      const med = normalizeMedication(child.key, child.val())
+      if (med) medications.push(med)
+    })
+    medications.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+    callback(medications)
+  })
+}
+
+export function addMedication(uid, medication) {
+  return push(ref(db, `users/${uid}/medications`), medication)
+}
+
+export function updateMedication(uid, medicationId, medication) {
+  return set(ref(db, `users/${uid}/medications/${medicationId}`), medication)
+}
+
+// Removing a medication takes its dose history with it.
+export async function deleteMedication(uid, medicationId) {
+  const snapshot = await get(ref(db, `users/${uid}/medication-logs`))
+  const updates = { [`users/${uid}/medications/${medicationId}`]: null }
+  snapshot.forEach(child => {
+    if (child.val()?.medicationId === medicationId) {
+      updates[`users/${uid}/medication-logs/${child.key}`] = null
+    }
+  })
+  return update(ref(db), updates)
+}
+
+export function subscribeMedicationLogs(uid, callback) {
+  return onValue(ref(db, `users/${uid}/medication-logs`), snapshot => {
     callback(snapshot.val() || {})
   })
 }
 
-export function saveTargets(uid, targets) {
-  return set(ref(db, `users/${uid}/targets`), targets)
+// Keyed by medication + day + slot, so ticking is idempotent.
+export function setMedicationDose(uid, medicationId, day, slot, takenAt) {
+  return set(ref(db, `users/${uid}/medication-logs/${logKey(medicationId, day, slot)}`), {
+    medicationId, day, slot, takenAt,
+  })
+}
+
+export function clearMedicationDose(uid, medicationId, day, slot) {
+  return remove(ref(db, `users/${uid}/medication-logs/${logKey(medicationId, day, slot)}`))
 }
 
 export function deleteAllData(uid) {
-  return remove(ref(db, `users/${uid}`))
+  return remove(ref(db, `users/${uid}/readings`))
 }
 
 export function seedSampleData(uid) {
-  const meals = ['fasting', 'before_meal', 'after_meal', 'bedtime']
   const bpNotes = ['', '', '', 'after coffee', 'resting', 'after walk', 'morning check', '']
   const bgNotes = ['', '', '', 'felt tired', 'after snack', 'before lunch', '']
   const promises = []
@@ -146,14 +248,6 @@ export function seedSampleData(uid) {
       }))
     }
   }
-
-  promises.push(set(ref(db, `users/${uid}/targets`), {
-    systolic: 120,
-    diastolic: 80,
-    glucose: 5.5,
-    bpEnabled: true,
-    glucoseEnabled: true,
-  }))
 
   return Promise.all(promises)
 }
