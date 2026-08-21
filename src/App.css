@@ -1264,27 +1264,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   animation: modal-fade-in 0.15s ease;
 }
 
-/* Navbar create button */
-.btn-create {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  padding: 9px 16px;
-  border: none;
-  border-radius: 999px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-
-.btn-create:hover {
-  background: var(--accent-hover);
-}
-
 /* Dashboard heading */
 .page-header {
   display: flex;
@@ -1304,6 +1283,91 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   font-size: 20px;
   font-weight: 650;
   letter-spacing: -0.2px;
+}
+
+/* Correlation picker */
+.corr-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.corr-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.corr-trigger:hover:not(:disabled) {
+  color: var(--text-primary);
+  border-color: var(--text-muted);
+}
+
+.corr-trigger:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.corr-trigger.corr-active {
+  border-color: var(--accent);
+  color: var(--accent-hover);
+}
+
+.corr-caret {
+  font-size: 9px;
+}
+
+.corr-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  min-width: 190px;
+  max-height: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.corr-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 400;
+  text-transform: none;
+  letter-spacing: 0;
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.corr-option:hover {
+  background: var(--bg-input);
+  color: var(--text-primary);
+}
+
+.corr-option input {
+  width: auto;
+  height: auto;
+  accent-color: var(--accent);
+  cursor: pointer;
 }
 
 /* Medications */
@@ -1788,9 +1852,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     padding: 11px 12px;
   }
 
-  .btn-create {
-    padding: 8px 12px;
-  }
 
   .main-content-single {
     max-width: 100%;
@@ -1906,6 +1967,15 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     order: 3;
   }
 
+  .corr-picker {
+    order: 4;
+  }
+
+  .corr-menu {
+    left: 0;
+    right: auto;
+  }
+
   .definition-actions,
   .definition-row .confirm-group {
     margin-left: auto;
@@ -1923,10 +1993,6 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
     flex-wrap: wrap;
   }
 
-  .btn-create {
-    font-size: 12px;
-    gap: 5px;
-  }
 }
 
 @media (max-width: 480px) {

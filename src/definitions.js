@@ -98,11 +98,15 @@ export function normalizeDefinition(id, raw) {
   const fields = Array.isArray(raw.fields)
     ? raw.fields
     : Object.keys(raw.fields || {}).sort().map(k => raw.fields[k])
+  const correlations = Array.isArray(raw.correlations)
+    ? raw.correlations
+    : Object.keys(raw.correlations || {}).sort().map(k => raw.correlations[k])
   return {
     ...raw,
     id,
     storage: raw.storage || 'nested',
     enabled: raw.enabled !== false,
+    correlations: correlations.filter(Boolean),
     fields: fields.filter(Boolean).map(f => ({
       ...f,
       options: Array.isArray(f.options)
