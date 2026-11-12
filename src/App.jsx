@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
-  loginWithGoogle, logout, onAuthChange, subscribeReadings, addReading, updateReading, deleteReading,
+  loginWithGoogle, logout, onAuthChange, consumeRedirectError, subscribeReadings, addReading, updateReading, deleteReading,
   seedSampleData, deleteAllData, subscribeDefinitions, addDefinition, updateDefinition, deleteDefinition,
   subscribeGlobalDefinitions, getSeededDefinitionIds, seedUserDefinitions,
   subscribeMedications, addMedication, updateMedication, deleteMedication,
@@ -1389,6 +1389,14 @@ function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
+  useEffect(() => {
+    consumeRedirectError().then(err => {
+      if (err && err.code !== 'auth/popup-closed-by-user') {
+        setError('Sign-in failed. Please try again.')
+      }
+    })
+  }, [])
+
   async function handleLogin() {
     setLoading(true)
     setError(null)
@@ -1951,7 +1959,7 @@ function App() {
         />
 
         {settingsPage ? (
-          <main className="main-content main-content-single">
+          <main key={page} className="main-content main-content-single page-enter">
             {settingsPage === 'readings' && (
               <ReadingTypesSettings
                 definitions={definitions}
@@ -1980,7 +1988,7 @@ function App() {
             )}
           </main>
         ) : activeMedication ? (
-          <main className="main-content main-content-stacked">
+          <main key={page} className="main-content main-content-stacked page-enter">
             <div className="page-header">
               <span className="dot" style={{ background: 'var(--accent-hover)' }} />
               <h2 className="page-title">{activeMedication.name}</h2>
@@ -1994,7 +2002,7 @@ function App() {
         ) : activeDefinition ? (
           /* Individual dashboard: stats, chart then readings on the left, with
              the entry form alongside. */
-          <main className="main-content">
+          <main key={page} className="main-content page-enter">
             <div className="panel-left">
               <div className="page-header">
                 <span className="dot" style={{ background: activeDefinition.color || 'var(--accent)' }} />
@@ -2034,7 +2042,7 @@ function App() {
           </main>
         ) : (
           /* All Readings: full-width stats, a two-up chart grid, then the table. */
-          <main className="main-content main-content-stacked">
+          <main key={page} className="main-content main-content-stacked page-enter">
             {enabledMedications.length > 0 && (
               <>
                 <div className="page-header">
