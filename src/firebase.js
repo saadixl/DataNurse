@@ -1,12 +1,16 @@
 import { initializeApp, getApps, getApp } from "firebase/app"
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, signOut, onAuthStateChanged } from "firebase/auth"
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut, onAuthStateChanged } from "firebase/auth"
 import { getDatabase, ref, push, remove, set, update, get, onValue, query, orderByChild } from "firebase/database"
 import { GLOBAL_DEFINITIONS, normalizeDefinition } from "./definitions"
 import { normalizeMedication, logKey, slotsFor, dayKey } from "./medications"
 
 const firebaseConfig = {
   apiKey: "AIzaSyBM3xz7rh-qN-_LyUqJBF1LoXy94klFOec",
-  authDomain: "datanurse-app.firebaseapp.com",
+  // Must be a domain the app itself is served from (not the default
+  // firebaseapp.com one). Mobile Safari/Chrome block the cross-site storage
+  // signInWithRedirect needs, so a mismatched authDomain makes redirect
+  // sign-in silently fail and drop back to the login screen.
+  authDomain: "datanurse.saadixl.com",
   projectId: "datanurse-app",
   storageBucket: "datanurse-app.firebasestorage.app",
   messagingSenderId: "964661041043",
@@ -19,6 +23,20 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
 const auth = getAuth(app)
 const db = getDatabase(app)
 const googleProvider = new GoogleAuthProvider()
+
+// Settled once, right away, so a failed redirect sign-in (e.g. still blocked
+// by the browser) surfaces as an error instead of silently reopening the
+// login screen. onAuthStateChanged alone can't tell "never signed in" apart
+// from "redirect sign-in just failed".
+let redirectError = null
+const redirectResultPromise = getRedirectResult(auth).catch(err => { redirectError = err })
+
+export async function consumeRedirectError() {
+  await redirectResultPromise
+  const err = redirectError
+  redirectError = null
+  return err
+}
 
 export function loginWithGoogle() {
   const isMobile = /iPad|iPhone|iPod|Android/i.test(navigator.userAgent) ||
