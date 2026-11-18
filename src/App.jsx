@@ -423,20 +423,30 @@ function StatCards({ definitions, readingsByDefinition, rangeDays }) {
         .filter(c => c.days > 0)
         .map(c => (rangeDays ? { ...c, days: rangeDays } : c))
         .map(({ field, days }) => {
-          const cutoff = days === Infinity ? -Infinity : now - days * 86400000
-          const values = (readingsByDefinition[definition.id] || [])
-            .filter(r => new Date(r.timestamp).getTime() >= cutoff)
-            .map(r => getFieldValue(r, definition, field))
-            .filter(v => typeof v === 'number' && Number.isFinite(v))
-          const avg = values.length ? +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1) : null
+          const span = days * 86400000
+          const cutoff = days === Infinity ? -Infinity : now - span
+          const points = (readingsByDefinition[definition.id] || [])
+            .map(r => ({ t: new Date(r.timestamp).getTime(), v: getFieldValue(r, definition, field) }))
+            .filter(p => typeof p.v === 'number' && Number.isFinite(p.v))
+          const values = points.filter(p => p.t >= cutoff).map(p => p.v)
+          // The window of the same length just before this one, for the trend.
+          const previous = days === Infinity ? [] : points.filter(p => p.t >= cutoff - span && p.t < cutoff).map(p => p.v)
+          const mean = (list) => (list.length ? list.reduce((a, b) => a + b, 0) / list.length : null)
+          const avg = values.length ? +mean(values).toFixed(1) : null
+          const prevAvg = mean(previous)
           const target = targetFor(field)
+          const inTarget = target && values.length ? values.filter(v => meetsTarget(v, target)).length / values.length : null
           return {
             id: `${definition.id}:${field.key}`,
             field,
             days,
             avg,
             count: values.length,
+            min: values.length ? Math.min(...values) : null,
+            max: values.length ? Math.max(...values) : null,
+            delta: avg !== null && prevAvg !== null ? +(avg - prevAvg).toFixed(1) : null,
             target,
+            inTarget,
             missed: meetsTarget(avg, target) === false,
           }
         })
@@ -453,8 +463,20 @@ function StatCards({ definitions, readingsByDefinition, rangeDays }) {
           <div className="stat-value">
             {c.avg !== null ? <>{c.avg} {c.field.unit && <span className="stat-unit">{c.field.unit}</span>}</> : '—'}
           </div>
+          {c.delta !== null && <TrendLine delta={c.delta} days={c.days} unit={c.field.unit} target={c.target} />}
           <div className="stat-sub">{c.days === Infinity ? 'All-time' : `${c.days}-day`} avg · {c.count} {c.count === 1 ? 'reading' : 'readings'}</div>
-          {c.target && <div className="stat-target">Target: {c.target.symbol} {c.target.value}</div>}
+          {c.min !== null && c.count > 1 && (
+            <div className="stat-range">
+              <span>Low <b>{+c.min.toFixed(1)}</b></span>
+              <span>High <b>{+c.max.toFixed(1)}</b></span>
+            </div>
+          )}
+          {c.target && (
+            <div className="stat-target">
+              Target {c.target.symbol} {c.target.value}
+              {c.inTarget !== null && <> · <b className={c.inTarget >= 0.7 ? 'in-target-good' : 'in-target-low'}>{Math.round(c.inTarget * 100)}%</b> in target</>}
+            </div>
+          )}
         </div>
       ))}
     </div>
@@ -474,6 +496,20 @@ const WEEKLY_AFTER_DAYS = 45
 
 // rangeDays limits the chart to that window (Infinity = all readings);
 // without it the chart shows the last 14 days that have readings.
+// Change against the previous window of the same length. With a target, the
+// direction that moves towards it is shown as good.
+function TrendLine({ delta, days, unit, target }) {
+  const flat = Math.abs(delta) < 0.05
+  const better = target ? (target.direction === 'max' ? delta < 0 : delta > 0) : null
+  const tone = flat || better === null ? 'trend-flat' : better ? 'trend-good' : 'trend-bad'
+  return (
+    <div className={`stat-trend ${tone}`}>
+      {flat ? '→ no change' : <>{delta > 0 ? '▲' : '▼'} {Math.abs(delta)}{unit ? ` ${unit}` : ''}</>}
+      <span className="stat-trend-vs"> vs previous {days} days</span>
+    </div>
+  )
+}
+
 function ReadingChart({ readings, definition, rangeDays }) {
   const numeric = numericFields(definition)
 

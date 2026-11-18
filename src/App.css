@@ -2346,3 +2346,41 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   text-transform: uppercase;
   color: var(--text-muted);
 }
+
+/* Stat card trend, range and time in target */
+.stat-trend {
+  margin-top: 6px;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  font-weight: 600;
+}
+
+.stat-trend-vs {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.trend-good { color: var(--good); }
+.trend-bad { color: var(--bad); }
+.trend-flat { color: var(--text-2); }
+
+.stat-range {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+}
+
+.stat-range b,
+.stat-target b {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.stat-target b.in-target-good { color: var(--good); }
+.stat-target b.in-target-low { color: var(--warn); }
