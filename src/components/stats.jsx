@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { averageDays, targetFor, meetsTarget, numericFields, getFieldValue } from '../definitions'
 import { readingsToCsv, downloadText, exportFilename } from '../exporting'
 import { ReadingReport } from './ReadingReport'
-import { ReadingChart } from './charts'
+import { ReadingChart } from './LazyCharts'
 import { AVERAGE_RANGES, rangeLabel, defaultAverageRange, loadAverageRange, saveAverageRange } from '../utils/ranges'
 
 function AverageRangePicker({ value, onChange, options }) {

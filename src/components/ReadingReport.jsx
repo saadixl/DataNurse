@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { targetFor, meetsTarget, readingScoreClass, numericFields, getFieldValue, formatFieldValue } from '../definitions'
 import { dayKey } from '../medications'
-import { ReadingChart } from './charts'
+import { ReadingChart } from './LazyCharts'
 import { formatTime, formatDayKey } from '../utils/format'
 
 function fieldSummary(readings, definition, field) {
