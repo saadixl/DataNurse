@@ -2628,3 +2628,58 @@ body.report-open {
 .toast-action:hover {
   background: rgba(255, 255, 255, 0.08);
 }
+
+/* ---------- Readings filters ---------- */
+.readings-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.readings-filters input,
+.readings-filters select {
+  height: 36px;
+  padding: 0 12px;
+  font-size: 0.84rem;
+  border-radius: 999px;
+}
+
+.readings-search {
+  flex: 1 1 200px;
+  width: auto;
+  min-width: 0;
+}
+
+.readings-filters select {
+  width: auto;
+  flex: 0 0 auto;
+}
+
+.date-filter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-3);
+}
+
+.date-filter input {
+  width: 150px;
+}
+
+.date-filter input::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+  cursor: pointer;
+}
+
+.readings-more {
+  display: flex;
+  justify-content: center;
+  padding: 14px 0 4px;
+}
