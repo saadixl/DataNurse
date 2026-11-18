@@ -2603,3 +2603,28 @@ body.report-open {
     break-inside: avoid;
   }
 }
+
+/* Toast with an Undo button: stays 6 s instead of 3 s */
+.toast-with-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 6px 6px 18px;
+  animation: toast-in 0.35s var(--ease), toast-out 0.3s ease 5.7s forwards;
+}
+
+.toast-action {
+  height: 30px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.toast-action:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
