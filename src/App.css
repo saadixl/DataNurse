@@ -2825,3 +2825,15 @@ button.cal-day:disabled {
 .reminder-time input::-webkit-calendar-picker-indicator {
   filter: invert(0.7);
 }
+
+/* Installed app on iOS draws under the status bar: keep the top bar and the
+   slide-out menu clear of it. */
+.navbar {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+@media (max-width: 900px) {
+  .sidebar {
+    padding-top: calc(16px + env(safe-area-inset-top, 0px));
+  }
+}
