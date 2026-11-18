@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import {
   loginWithGoogle, logout, onAuthChange, consumeRedirectError, subscribeReadings, addReading, updateReading, deleteReading,
   seedSampleData, deleteAllData, subscribeDefinitions, addDefinition, updateDefinition, deleteDefinition,
@@ -16,6 +17,7 @@ import {
   dayKey, logKey, todayProgress, progressState, medicationStats,
 } from './medications'
 import { BarChart, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Cell } from 'recharts'
+import { readingsToCsv, downloadText, exportFilename } from './exporting'
 import './App.css'
 
 const DEFINITION_COLORS = ['#f59e0b', '#38bdf8', '#a78bfa', '#2dd4bf', '#4ade80', '#facc15']
@@ -395,6 +397,7 @@ function AverageRangePicker({ value, onChange, options }) {
 function DefinitionStats({ definition, readingsByDefinition }) {
   const readings = readingsByDefinition[definition.id] || []
   const [range, setRange] = useState(() => loadAverageRange(definition))
+  const [reportOpen, setReportOpen] = useState(false)
   const options = useMemo(() => {
     const own = defaultAverageRange(definition)
     return AVERAGE_RANGES.includes(own) ? AVERAGE_RANGES : [own, ...AVERAGE_RANGES].sort((a, b) => a - b)
@@ -404,11 +407,32 @@ function DefinitionStats({ definition, readingsByDefinition }) {
     saveAverageRange(definition, days)
   }
 
+  const inRange = range === Infinity
+    ? readings
+    : readings.filter(r => new Date(r.timestamp).getTime() >= Date.now() - range * 86400000)
+
+  const exportCsv = () => {
+    downloadText(exportFilename(definition.name), readingsToCsv(inRange, { [definition.id]: definition }))
+  }
+
   return (
     <>
-      <AverageRangePicker value={range} onChange={change} options={options.includes(range) ? options : [range, ...options].sort((a, b) => a - b)} />
+      <div className="range-row">
+        <AverageRangePicker value={range} onChange={change} options={options.includes(range) ? options : [range, ...options].sort((a, b) => a - b)} />
+        <div className="export-actions">
+          <button type="button" className="btn-chip" onClick={exportCsv} disabled={inRange.length === 0} title="Download these readings as a spreadsheet">
+            CSV
+          </button>
+          <button type="button" className="btn-chip" onClick={() => setReportOpen(true)} disabled={inRange.length === 0} title="A printable summary for your doctor">
+            Report
+          </button>
+        </div>
+      </div>
       <StatCards definitions={[definition]} readingsByDefinition={readingsByDefinition} rangeDays={range} />
       <ReadingChart definition={definition} readings={readings} rangeDays={range} />
+      {reportOpen && (
+        <ReadingReport definition={definition} readings={inRange} rangeDays={range} onClose={() => setReportOpen(false)} />
+      )}
     </>
   )
 }
@@ -496,6 +520,118 @@ const WEEKLY_AFTER_DAYS = 45
 
 // rangeDays limits the chart to that window (Infinity = all readings);
 // without it the chart shows the last 14 days that have readings.
+// Average, low, high and share in target for one field over some readings.
+function fieldSummary(readings, definition, field) {
+  const values = readings
+    .map(r => getFieldValue(r, definition, field))
+    .filter(v => typeof v === 'number' && Number.isFinite(v))
+  if (values.length === 0) return null
+  const target = targetFor(field)
+  return {
+    avg: +(values.reduce((a, b) => a + b, 0) / values.length).toFixed(1),
+    min: Math.min(...values),
+    max: Math.max(...values),
+    count: values.length,
+    target,
+    inTarget: target ? values.filter(v => meetsTarget(v, target)).length / values.length : null,
+  }
+}
+
+// A printable summary of one reading type: averages, the chart and every reading.
+function ReadingReport({ definition, readings, rangeDays, onClose }) {
+  const numeric = numericFields(definition)
+  const sorted = [...readings].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
+  const first = sorted[sorted.length - 1]
+  const last = sorted[0]
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    document.body.classList.add('report-open')
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      document.body.classList.remove('report-open')
+    }
+  }, [onClose])
+
+  return createPortal(
+    <div className="print-report" role="dialog" aria-label={`${definition.name} report`}>
+      <div className="report-toolbar">
+        <span>Preview · use Print to save as PDF</span>
+        <div>
+          <button type="button" className="btn-chip" onClick={() => window.print()}>Print</button>
+          <button type="button" className="btn-chip" onClick={onClose}>Close</button>
+        </div>
+      </div>
+      <div className="report-page">
+        <header className="report-header">
+          <div>
+            <p className="report-brand">DataNurse</p>
+            <h1>{definition.name} report</h1>
+            <p className="report-meta">
+              {rangeDays === Infinity ? 'All readings' : `Last ${rangeDays} days`}
+              {first && last && <> · {formatDayKey(dayKey(new Date(first.timestamp)))} – {formatDayKey(dayKey(new Date(last.timestamp)))}</>}
+              {' · '}{readings.length} {readings.length === 1 ? 'reading' : 'readings'}
+            </p>
+          </div>
+          <p className="report-meta">Generated {formatDayKey(dayKey())}</p>
+        </header>
+
+        {numeric.length > 0 && (
+          <table className="report-table report-summary">
+            <thead>
+              <tr><th>Measure</th><th>Average</th><th>Low</th><th>High</th><th>Target</th><th>In target</th></tr>
+            </thead>
+            <tbody>
+              {numeric.map(f => {
+                const sum = fieldSummary(readings, definition, f)
+                return (
+                  <tr key={f.key}>
+                    <td>{f.label}{f.unit && <span className="report-unit"> ({f.unit})</span>}</td>
+                    <td><b>{sum ? sum.avg : '—'}</b></td>
+                    <td>{sum ? +sum.min.toFixed(1) : '—'}</td>
+                    <td>{sum ? +sum.max.toFixed(1) : '—'}</td>
+                    <td>{sum?.target ? `${sum.target.symbol} ${sum.target.value}` : '—'}</td>
+                    <td>{sum?.inTarget != null ? `${Math.round(sum.inTarget * 100)}%` : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+
+        {numeric.length > 0 && (
+          <div className="report-chart">
+            <ReadingChart definition={definition} readings={readings} rangeDays={rangeDays} />
+          </div>
+        )}
+
+        <table className="report-table">
+          <thead>
+            <tr>
+              <th>Date</th><th>Time</th>
+              {(definition.fields || []).map(f => <th key={f.key}>{f.label}{f.unit && <span className="report-unit"> ({f.unit})</span>}</th>)}
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map(r => (
+              <tr key={r.id} className={readingScoreClass(r, definition)}>
+                <td>{formatDayKey(dayKey(new Date(r.timestamp)))}</td>
+                <td>{formatTime(r.timestamp)}</td>
+                {(definition.fields || []).map(f => <td key={f.key}>{formatFieldValue(f, getFieldValue(r, definition, f)) ?? '—'}</td>)}
+                <td className="report-notes">{r.notes || ''}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <p className="report-footer">Readings recorded by the patient in DataNurse. Not a medical device.</p>
+      </div>
+    </div>,
+    document.body
+  )
+}
+
 // Change against the previous window of the same length. With a target, the
 // direction that moves towards it is shown as good.
 function TrendLine({ delta, days, unit, target }) {
@@ -1440,7 +1576,7 @@ function MedicationHomeCards({ medications, logs, onOpen }) {
 
 /* ---------- Settings ---------- */
 
-function DataSettings({ onDeleteData, onSeedData }) {
+function DataSettings({ onDeleteData, onSeedData, onExport, readingCount }) {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
@@ -1459,6 +1595,17 @@ function DataSettings({ onDeleteData, onSeedData }) {
     <div className="settings-page">
             <p className="settings-desc">Manage your health readings and sample data.</p>
 
+            <div className="card">
+              <div className="danger-action">
+                <div>
+                  <div className="danger-label">Export readings</div>
+                  <div className="danger-desc">Download every reading as a CSV file for a spreadsheet or your doctor. For a single type, use CSV or Report on its page.</div>
+                </div>
+                <button className="btn-danger-outline btn-neutral-outline" onClick={onExport} disabled={readingCount === 0}>
+                  Export CSV
+                </button>
+              </div>
+            </div>
             <div className="card">
               <div className="danger-action">
                 <div>
@@ -2141,7 +2288,12 @@ function App() {
               />
             )}
             {settingsPage === 'data' && (
-              <DataSettings onDeleteData={handleDeleteAllData} onSeedData={handleSeedData} />
+              <DataSettings
+                onDeleteData={handleDeleteAllData}
+                onSeedData={handleSeedData}
+                readingCount={readings.length}
+                onExport={() => downloadText(exportFilename('all-readings'), readingsToCsv(readings, definitionById))}
+              />
             )}
             {settingsPage === 'account' && (
               <AccountSettings user={user} onLogout={logout} />
