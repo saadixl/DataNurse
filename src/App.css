@@ -2797,3 +2797,31 @@ button.cal-day:disabled {
   height: 28px;
   font-size: 0.74rem;
 }
+
+/* ---------- Reminders ---------- */
+.reminder-card .toggle {
+  flex-shrink: 0;
+}
+
+.reminder-times {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.reminder-time {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.reminder-time input {
+  width: 130px;
+}
+
+.reminder-time input::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}

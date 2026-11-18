@@ -19,6 +19,9 @@ import {
 } from './medications'
 import { BarChart, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Cell } from 'recharts'
 import { readingsToCsv, downloadText, exportFilename } from './exporting'
+import {
+  DEFAULT_REMINDER_TIMES, remindersSupported, loadReminderSettings, saveReminderSettings, useDoseReminders,
+} from './reminders'
 import './App.css'
 
 const DEFINITION_COLORS = ['#f59e0b', '#38bdf8', '#a78bfa', '#2dd4bf', '#4ade80', '#facc15']
@@ -1446,6 +1449,61 @@ function MedicationForm({ medication, medications, onSubmit, onCancel }) {
   )
 }
 
+// Browser notifications when a dose is due. Per browser, since permission is.
+function ReminderSettings({ settings, onChange }) {
+  const supported = remindersSupported()
+  const [permission, setPermission] = useState(() => (supported ? Notification.permission : 'denied'))
+
+  async function toggle(on) {
+    if (on && permission !== 'granted') {
+      const result = await Notification.requestPermission()
+      setPermission(result)
+      if (result !== 'granted') return
+    }
+    onChange({ ...settings, enabled: on })
+  }
+
+  return (
+    <div className="card reminder-card">
+      <div className="danger-action">
+        <div>
+          <div className="danger-label">Dose reminders</div>
+          <div className="danger-desc">
+            A notification when a dose is due and not ticked off yet. Reminders come while DataNurse is open in a tab
+            or installed on your home screen.
+          </div>
+        </div>
+        <label className="toggle" title={supported ? undefined : 'This browser does not support notifications'}>
+          <input
+            type="checkbox"
+            checked={settings.enabled && permission === 'granted'}
+            disabled={!supported || permission === 'denied'}
+            onChange={e => toggle(e.target.checked)}
+          />
+          <span className="toggle-slider" />
+        </label>
+      </div>
+      {permission === 'denied' && supported && (
+        <p className="builder-hint">Notifications are blocked for this site. Allow them in your browser&apos;s site settings to use reminders.</p>
+      )}
+      {settings.enabled && permission === 'granted' && (
+        <div className="reminder-times">
+          {Object.keys(DEFAULT_REMINDER_TIMES).map(slot => (
+            <label key={slot} className="reminder-time">
+              <span>{slotLabel(slot)}</span>
+              <input
+                type="time"
+                value={settings.times[slot]}
+                onChange={e => onChange({ ...settings, times: { ...settings.times, [slot]: e.target.value } })}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function MedicationsSettings({ medications, onCreate, onUpdate, onDelete, onToggle }) {
   const [mode, setMode] = useState(null)
   const [pendingDelete, setPendingDelete] = useState(null)
@@ -2180,6 +2238,14 @@ function App() {
   const enabledDefinitions = useMemo(() => definitions.filter(d => d.enabled), [definitions])
   const enabledMedications = useMemo(() => medications.filter(m => m.enabled), [medications])
 
+  const [reminderSettings, setReminderSettings] = useState(loadReminderSettings)
+  const changeReminderSettings = useCallback((next) => {
+    setReminderSettings(next)
+    saveReminderSettings(next)
+  }, [])
+  const onRemind = useCallback((med, slot) => showToast(`Time for ${med.name} · ${slotLabel(slot)} dose`), [showToast])
+  useDoseReminders(user ? medications : [], medicationLogs, reminderSettings, onRemind)
+
   const definitionById = useMemo(
     () => Object.fromEntries(definitions.map(d => [d.id, d])),
     [definitions]
@@ -2438,6 +2504,9 @@ function App() {
                 onToggle={handleToggleDefinition}
                 onSetCorrelations={handleSetCorrelations}
               />
+            )}
+            {settingsPage === 'medications' && (
+              <ReminderSettings settings={reminderSettings} onChange={changeReminderSettings} />
             )}
             {settingsPage === 'medications' && (
               <MedicationsSettings
