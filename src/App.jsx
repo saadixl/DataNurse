@@ -334,12 +334,16 @@ function ReadingItem({ reading, definition, onDelete, onEdit, table }) {
 /* ---------- Stats & charts ---------- */
 
 const chartTooltipStyle = {
-  backgroundColor: '#f9fafb',
-  border: '1px solid #d1d5db',
-  borderRadius: '8px',
+  backgroundColor: 'rgba(14, 16, 22, 0.92)',
+  border: '1px solid rgba(255, 255, 255, 0.13)',
+  borderRadius: '12px',
+  boxShadow: '0 24px 60px -18px rgba(0, 0, 0, 0.8)',
+  backdropFilter: 'blur(12px)',
   fontSize: '12px',
-  color: '#111827',
+  color: '#f4f5f8',
 }
+const chartTooltipLabelStyle = { color: '#a6abb8', marginBottom: 4 }
+const chartTooltipItemStyle = { padding: '1px 0' }
 
 // Windows offered by the average range picker on a definition's page.
 // Infinity means all readings.
@@ -521,21 +525,21 @@ function ReadingChart({ readings, definition }) {
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height={260}>
           <BarChart data={data} barGap={2} barCategoryGap="20%">
-            <CartesianGrid strokeDasharray="3 3" stroke="#2e3248" vertical={false} />
-            <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={{ stroke: '#2e3248' }} tickLine={false} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+            <XAxis dataKey="date" tick={{ fill: '#6c7282', fontSize: 11 }} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false} />
             <YAxis
               domain={bounds}
-              tick={{ fill: '#6b7280', fontSize: 11 }}
+              tick={{ fill: '#6c7282', fontSize: 11 }}
               axisLine={false}
               tickLine={false}
               width={38}
             />
-            <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'rgba(99,102,241,0.08)' }} />
-            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: '#9ca3af' }} />
+            <Tooltip contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: '#a6abb8' }} />
             {numeric.map((f, i) => {
               const target = targetFor(f)
               return (
-                <Bar key={f.key} dataKey={f.key} name={f.label} radius={[4, 4, 0, 0]}>
+                <Bar key={f.key} dataKey={f.key} name={f.label} radius={[6, 6, 2, 2]}>
                   {data.map((d, j) => (
                     <Cell
                       key={j}
@@ -627,12 +631,12 @@ function CorrelationChart({ base, other, readingsByDefinition }) {
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height={260}>
           <ComposedChart data={data} barGap={2} barCategoryGap="20%">
-            <CartesianGrid strokeDasharray="3 3" stroke="#2e3248" vertical={false} />
-            <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={{ stroke: '#2e3248' }} tickLine={false} />
-            <YAxis yAxisId="base" domain={[0, 'auto']} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={38} />
-            <YAxis yAxisId="other" orientation="right" domain={[0, 'auto']} tick={{ fill: '#6b7280', fontSize: 11 }} axisLine={false} tickLine={false} width={38} />
-            <Tooltip contentStyle={chartTooltipStyle} cursor={{ fill: 'rgba(99,102,241,0.08)' }} />
-            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: '#9ca3af' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+            <XAxis dataKey="date" tick={{ fill: '#6c7282', fontSize: 11 }} axisLine={{ stroke: 'rgba(255,255,255,0.08)' }} tickLine={false} />
+            <YAxis yAxisId="base" domain={[0, 'auto']} tick={{ fill: '#6c7282', fontSize: 11 }} axisLine={false} tickLine={false} width={38} />
+            <YAxis yAxisId="other" orientation="right" domain={[0, 'auto']} tick={{ fill: '#6c7282', fontSize: 11 }} axisLine={false} tickLine={false} width={38} />
+            <Tooltip contentStyle={chartTooltipStyle} labelStyle={chartTooltipLabelStyle} itemStyle={chartTooltipItemStyle} cursor={{ fill: 'rgba(255,255,255,0.04)' }} />
+            <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: '12px', color: '#a6abb8' }} />
             {baseFields.map((f, i) => (
               <Bar
                 key={f.key}
@@ -640,7 +644,7 @@ function CorrelationChart({ base, other, readingsByDefinition }) {
                 dataKey={'a_' + f.key}
                 name={f.label}
                 fill={fieldColor(base, i)}
-                radius={[4, 4, 0, 0]}
+                radius={[6, 6, 2, 2]}
               />
             ))}
             {otherFields.map((f, i) => (
@@ -1383,7 +1387,6 @@ function DataSettings({ onDeleteData, onSeedData }) {
 
   return (
     <div className="settings-page">
-            <h2 className="settings-title">Data</h2>
             <p className="settings-desc">Manage your health readings and sample data.</p>
 
             <div className="card">
@@ -1420,7 +1423,6 @@ function DataSettings({ onDeleteData, onSeedData }) {
 function AccountSettings({ user, onLogout }) {
   return (
     <div className="settings-page">
-            <h2 className="settings-title">Account</h2>
             <p className="settings-desc">Manage your account and sign-in details.</p>
 
             <div className="card">
@@ -1484,14 +1486,10 @@ function LoginScreen() {
   return (
     <div className="login-screen">
       <div className="login-card">
-        <svg width="56" height="56" viewBox="0 0 28 28" fill="none" className="login-logo">
-          <rect width="28" height="28" rx="8" fill="#6366f1"/>
-          <rect x="11.5" y="5" width="5" height="18" rx="1" fill="white" fillOpacity="0.9"/>
-          <rect x="5" y="11.5" width="18" height="5" rx="1" fill="white" fillOpacity="0.9"/>
-          <polyline points="7,18 11,14 14.5,17 17.5,10 21,13" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
+        <span className="login-logo"><BrandMark size={60} /></span>
+        <p className="eyebrow eyebrow-accent">Your health, in numbers</p>
         <h1>DataNurse</h1>
-        <p>Health Monitoring System</p>
+        <p>Track readings and medications, and see how they trend over time.</p>
         <button className="btn btn-google" onClick={handleLogin} disabled={loading}>
           <svg viewBox="0 0 24 24" width="20" height="20">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
@@ -1642,6 +1640,31 @@ function useToast() {
     setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
   }, [])
   return { toasts, show }
+}
+
+function BrandMark({ size = 32 }) {
+  return (
+    <span className="brand-mark" style={{ width: size, height: size }} aria-hidden="true">
+      <svg viewBox="0 0 24 24" width={size * 0.58} height={size * 0.58}>
+        <path d="M12 4v16M4 12h16" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" opacity="0.35" />
+        <path d="M3 14h4l2.5-5 4 8 2.5-5H21" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+      </svg>
+    </span>
+  )
+}
+
+function PageHeader({ eyebrow, title, color, lead }) {
+  return (
+    <header className="page-header">
+      {eyebrow && (
+        <p className="eyebrow" style={color ? { '--eyebrow-color': color } : undefined}>
+          {eyebrow}
+        </p>
+      )}
+      <h2 className="page-title">{title}</h2>
+      {lead && <p className="page-lead">{lead}</p>}
+    </header>
+  )
 }
 
 function Sidebar({ definitions, medications, medicationLogs, page, onSelect, counts, total, open, onClose }) {
@@ -2001,12 +2024,7 @@ function App() {
               <MenuIcon />
             </button>
             <div className="navbar-brand" onClick={() => handleSelectPage('all')} style={{ cursor: 'pointer' }}>
-              <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-                <rect width="28" height="28" rx="8" fill="#6366f1"/>
-                <rect x="11.5" y="5" width="5" height="18" rx="1" fill="white" fillOpacity="0.9"/>
-                <rect x="5" y="11.5" width="18" height="5" rx="1" fill="white" fillOpacity="0.9"/>
-                <polyline points="7,18 11,14 14.5,17 17.5,10 21,13" fill="none" stroke="#6366f1" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
+              <BrandMark />
               <div className="brand-text">
                 <span className="brand-name">DataNurse</span>
                 <span className="brand-tagline">Health Monitoring System</span>
@@ -2031,6 +2049,7 @@ function App() {
 
         {settingsPage ? (
           <main key={page} className="main-content main-content-single page-enter">
+            <PageHeader eyebrow="Settings" title={SETTINGS_PAGES.find(p => p.id === page)?.label || 'Settings'} />
             {settingsPage === 'readings' && (
               <ReadingTypesSettings
                 definitions={definitions}
@@ -2060,10 +2079,7 @@ function App() {
           </main>
         ) : activeMedication ? (
           <main key={page} className="main-content main-content-stacked page-enter">
-            <div className="page-header">
-              <span className="dot" style={{ background: 'var(--accent-hover)' }} />
-              <h2 className="page-title">{activeMedication.name}</h2>
-            </div>
+            <PageHeader eyebrow="Medication" title={activeMedication.name} />
             <MedicationPage
               medication={activeMedication}
               logs={medicationLogs}
@@ -2075,10 +2091,7 @@ function App() {
              the entry form alongside. */
           <main key={page} className="main-content page-enter">
             <div className="panel-left">
-              <div className="page-header">
-                <span className="dot" style={{ background: activeDefinition.color || 'var(--accent)' }} />
-                <h2 className="page-title">{activeDefinition.name}</h2>
-              </div>
+              <PageHeader eyebrow="Reading" title={activeDefinition.name} color={activeDefinition.color} />
 
               {dataLoading ? (
                 <>
@@ -2116,9 +2129,7 @@ function App() {
           <main key={page} className="main-content main-content-stacked page-enter">
             {enabledMedications.length > 0 && (
               <>
-                <div className="page-header">
-                  <h2 className="page-title">Medications</h2>
-                </div>
+                <PageHeader eyebrow="Today" title="Medications" />
                 <MedicationHomeCards
                   medications={enabledMedications}
                   logs={medicationLogs}
@@ -2127,9 +2138,8 @@ function App() {
               </>
             )}
 
-            <div className="page-header">
-              <h2 className="page-title">Readings</h2>
-            </div>
+            {enabledMedications.length === 0 && <PageHeader eyebrow="Overview" title="Your health" />}
+            <h3 className="section-title">Readings</h3>
 
             {dataLoading ? (
               <>
