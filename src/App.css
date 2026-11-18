@@ -2765,3 +2765,35 @@ body.report-open {
   border-radius: 3px;
   border: 1px solid transparent;
 }
+
+button.cal-day {
+  cursor: pointer;
+  font: inherit;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  padding: 0;
+  transition: transform 0.15s var(--ease), border-color 0.2s var(--ease);
+}
+
+button.cal-day:hover:not(:disabled) {
+  transform: translateY(-1px);
+  border-color: var(--line-strong);
+}
+
+button.cal-day:disabled {
+  cursor: default;
+}
+
+.cal-selected {
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px #a78bfa;
+}
+
+.cal-hint {
+  margin-top: 10px;
+}
+
+.card-title-action {
+  margin-left: auto;
+  height: 28px;
+  font-size: 0.74rem;
+}
