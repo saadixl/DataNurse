@@ -807,6 +807,19 @@ input[type="datetime-local"]::-webkit-calendar-picker-indicator {
   min-width: 0;
 }
 
+/* Average range picker (above a definition's stat cards) */
+.range-picker {
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 14px;
+}
+
+.range-picker .tab {
+  flex: 0 0 auto;
+  padding: 6px 14px;
+  font-size: 13px;
+}
+
 /* Stat cards */
 .stat-cards {
   display: grid;

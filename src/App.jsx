@@ -341,15 +341,86 @@ const chartTooltipStyle = {
   color: '#111827',
 }
 
-function StatCards({ definitions, readingsByDefinition }) {
+// Windows offered by the average range picker on a definition's page.
+// Infinity means all readings.
+const AVERAGE_RANGES = [7, 14, 30, 90, Infinity]
+const rangeLabel = (days) => (days === Infinity ? 'All' : `${days}D`)
+const rangeStorageKey = (definitionId) => `datanurse:avg-range:${definitionId}`
+
+// The window a definition's average cards use by default: its fields' own setting.
+function defaultAverageRange(definition) {
+  return Math.max(0, ...numericFields(definition).map(averageDays)) || DEFAULT_AVERAGE_DAYS
+}
+
+function loadAverageRange(definition) {
+  try {
+    const v = localStorage.getItem(rangeStorageKey(definition.id))
+    if (v === 'all') return Infinity
+    const n = Number(v)
+    if (v && Number.isFinite(n) && n > 0) return n
+  } catch { /* storage unavailable */ }
+  return defaultAverageRange(definition)
+}
+
+function saveAverageRange(definition, days) {
+  try {
+    localStorage.setItem(rangeStorageKey(definition.id), days === Infinity ? 'all' : String(days))
+  } catch { /* storage unavailable */ }
+}
+
+function AverageRangePicker({ value, onChange, options }) {
+  return (
+    <div className="tabs range-picker" role="radiogroup" aria-label="Average over">
+      {options.map(days => (
+        <button
+          key={days}
+          type="button"
+          role="radio"
+          aria-checked={value === days}
+          className={`tab ${value === days ? 'active' : ''}`}
+          onClick={() => onChange(days)}
+        >
+          {rangeLabel(days)}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+// A definition's average cards with a picker above them to change the window.
+function DefinitionStats({ definition, readingsByDefinition }) {
+  const [range, setRange] = useState(() => loadAverageRange(definition))
+  const options = useMemo(() => {
+    const own = defaultAverageRange(definition)
+    return AVERAGE_RANGES.includes(own) ? AVERAGE_RANGES : [own, ...AVERAGE_RANGES].sort((a, b) => a - b)
+  }, [definition])
+  const hasCards = numericFields(definition).some(f => averageDays(f) > 0)
+  if (!hasCards) return null
+
+  const change = (days) => {
+    setRange(days)
+    saveAverageRange(definition, days)
+  }
+
+  return (
+    <>
+      <AverageRangePicker value={range} onChange={change} options={options.includes(range) ? options : [range, ...options].sort((a, b) => a - b)} />
+      <StatCards definitions={[definition]} readingsByDefinition={readingsByDefinition} rangeDays={range} />
+    </>
+  )
+}
+
+// rangeDays overrides each field's own window (Infinity = all readings).
+function StatCards({ definitions, readingsByDefinition, rangeDays }) {
   const cards = useMemo(() => {
     const now = Date.now()
     return definitions.flatMap(definition =>
       numericFields(definition)
         .map(field => ({ definition, field, days: averageDays(field) }))
         .filter(c => c.days > 0)
+        .map(c => (rangeDays ? { ...c, days: rangeDays } : c))
         .map(({ field, days }) => {
-          const cutoff = now - days * 86400000
+          const cutoff = days === Infinity ? -Infinity : now - days * 86400000
           const values = (readingsByDefinition[definition.id] || [])
             .filter(r => new Date(r.timestamp).getTime() >= cutoff)
             .map(r => getFieldValue(r, definition, field))
@@ -367,7 +438,7 @@ function StatCards({ definitions, readingsByDefinition }) {
           }
         })
     )
-  }, [definitions, readingsByDefinition])
+  }, [definitions, readingsByDefinition, rangeDays])
 
   if (cards.length === 0) return null
 
@@ -379,7 +450,7 @@ function StatCards({ definitions, readingsByDefinition }) {
           <div className="stat-value">
             {c.avg !== null ? <>{c.avg} {c.field.unit && <span className="stat-unit">{c.field.unit}</span>}</> : '—'}
           </div>
-          <div className="stat-sub">{c.days}-day avg · {c.count} readings</div>
+          <div className="stat-sub">{c.days === Infinity ? 'All-time' : `${c.days}-day`} avg · {c.count} {c.count === 1 ? 'reading' : 'readings'}</div>
           {c.target && <div className="stat-target">Target: {c.target.symbol} {c.target.value}</div>}
         </div>
       ))}
@@ -2017,7 +2088,7 @@ function App() {
                 </>
               ) : (
                 <>
-                  <StatCards definitions={[activeDefinition]} readingsByDefinition={readingsByDefinition} />
+                  <DefinitionStats key={activeDefinition.id} definition={activeDefinition} readingsByDefinition={readingsByDefinition} />
                   <ReadingChart definition={activeDefinition} readings={filtered} />
                   <ReadingsCard
                     readings={filtered}
