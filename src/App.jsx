@@ -374,7 +374,7 @@ function saveAverageRange(definition, days) {
 
 function AverageRangePicker({ value, onChange, options }) {
   return (
-    <div className="tabs range-picker" role="radiogroup" aria-label="Average over">
+    <div className="tabs range-picker" role="radiogroup" aria-label="Time range">
       {options.map(days => (
         <button
           key={days}
@@ -391,16 +391,14 @@ function AverageRangePicker({ value, onChange, options }) {
   )
 }
 
-// A definition's average cards with a picker above them to change the window.
+// A definition's average cards and chart, with a picker above them to change the window.
 function DefinitionStats({ definition, readingsByDefinition }) {
+  const readings = readingsByDefinition[definition.id] || []
   const [range, setRange] = useState(() => loadAverageRange(definition))
   const options = useMemo(() => {
     const own = defaultAverageRange(definition)
     return AVERAGE_RANGES.includes(own) ? AVERAGE_RANGES : [own, ...AVERAGE_RANGES].sort((a, b) => a - b)
   }, [definition])
-  const hasCards = numericFields(definition).some(f => averageDays(f) > 0)
-  if (!hasCards) return null
-
   const change = (days) => {
     setRange(days)
     saveAverageRange(definition, days)
@@ -410,6 +408,7 @@ function DefinitionStats({ definition, readingsByDefinition }) {
     <>
       <AverageRangePicker value={range} onChange={change} options={options.includes(range) ? options : [range, ...options].sort((a, b) => a - b)} />
       <StatCards definitions={[definition]} readingsByDefinition={readingsByDefinition} rangeDays={range} />
+      <ReadingChart definition={definition} readings={readings} rangeDays={range} />
     </>
   )
 }
@@ -462,15 +461,41 @@ function StatCards({ definitions, readingsByDefinition, rangeDays }) {
   )
 }
 
-function ReadingChart({ readings, definition }) {
+// Monday of the week a timestamp falls in, as a local date string.
+function weekStart(ts) {
+  const d = new Date(ts)
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - ((d.getDay() + 6) % 7))
+  return d
+}
+
+// Charting more than this many days switches from daily to weekly bars.
+const WEEKLY_AFTER_DAYS = 45
+
+// rangeDays limits the chart to that window (Infinity = all readings);
+// without it the chart shows the last 14 days that have readings.
+function ReadingChart({ readings, definition, rangeDays }) {
   const numeric = numericFields(definition)
+
+  const inRange = useMemo(() => {
+    if (!rangeDays || rangeDays === Infinity) return readings
+    const cutoff = Date.now() - rangeDays * 86400000
+    return readings.filter(r => new Date(r.timestamp).getTime() >= cutoff)
+  }, [readings, rangeDays])
+
+  // Weekly bars once the readings span more than WEEKLY_AFTER_DAYS.
+  const weekly = useMemo(() => {
+    if (!rangeDays || inRange.length < 2) return false
+    const times = inRange.map(r => new Date(r.timestamp).getTime())
+    return (Math.max(...times) - Math.min(...times)) / 86400000 > WEEKLY_AFTER_DAYS
+  }, [inRange, rangeDays])
 
   const data = useMemo(() => {
     if (numeric.length === 0) return []
     const byDay = {}
-    readings.forEach(r => {
-      const day = new Date(r.timestamp).toDateString()
-      if (!byDay[day]) byDay[day] = { timestamp: r.timestamp, values: {} }
+    inRange.forEach(r => {
+      const day = weekly ? weekStart(r.timestamp).toDateString() : new Date(r.timestamp).toDateString()
+      if (!byDay[day]) byDay[day] = { timestamp: weekly ? weekStart(r.timestamp).toISOString() : r.timestamp, values: {} }
       numeric.forEach(f => {
         const v = getFieldValue(r, definition, f)
         if (typeof v === 'number' && Number.isFinite(v)) {
@@ -480,7 +505,7 @@ function ReadingChart({ readings, definition }) {
     })
     return Object.values(byDay)
       .map(day => {
-        const point = { date: formatShortDate(day.timestamp), sortKey: new Date(day.timestamp).getTime() }
+        const point = { date: `${weekly ? 'Wk of ' : ''}${formatShortDate(day.timestamp)}`, sortKey: new Date(day.timestamp).getTime() }
         numeric.forEach(f => {
           const vals = day.values[f.key]
           point[f.key] = vals?.length ? +(vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1) : null
@@ -488,8 +513,12 @@ function ReadingChart({ readings, definition }) {
         return point
       })
       .sort((a, b) => a.sortKey - b.sortKey)
-      .slice(-14)
-  }, [readings, definition, numeric])
+      .slice(rangeDays ? 0 : -14)
+  }, [inRange, definition, numeric, weekly, rangeDays])
+
+  const title = !rangeDays
+    ? 'Last 14 days'
+    : rangeDays === Infinity ? 'All time' : `Last ${rangeDays} days`
 
   // Pad around both the plotted values and any target lines, so a target well
   // outside the data range still shows up.
@@ -513,14 +542,19 @@ function ReadingChart({ readings, definition }) {
     return <div className="chart-empty">Add a number field to {definition.name} to see a chart.</div>
   }
   if (data.length === 0) {
-    return <div className="chart-empty">No {definition.name.toLowerCase()} data to chart</div>
+    return (
+      <div className="chart-empty">
+        {rangeDays ? `No ${definition.name.toLowerCase()} readings in this range` : `No ${definition.name.toLowerCase()} data to chart`}
+      </div>
+    )
   }
 
   return (
     <div className="chart-card">
       <h3 className="chart-title">
         <span className="dot" style={{ background: definition.color || 'var(--accent)' }} />
-        {definition.name} — Last 14 days
+        {definition.name} — {title}
+        {weekly && <span className="chart-title-note">weekly averages</span>}
       </h3>
       <div className="chart-wrap">
         <ResponsiveContainer width="100%" height={260}>
@@ -2102,7 +2136,6 @@ function App() {
               ) : (
                 <>
                   <DefinitionStats key={activeDefinition.id} definition={activeDefinition} readingsByDefinition={readingsByDefinition} />
-                  <ReadingChart definition={activeDefinition} readings={filtered} />
                   <ReadingsCard
                     readings={filtered}
                     definitionById={definitionById}
