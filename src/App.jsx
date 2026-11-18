@@ -15,7 +15,7 @@ import {
 import {
   MAX_MEDICATION_EXTRAS, FREQUENCIES, MEAL_TIMINGS, slotsFor, slotLabel, mealLabel, frequencyLabel,
   dayKey, logKey, todayProgress, progressState, medicationStats,
-  adherence, streak, adherenceCalendar, parseDayKey,
+  adherence, streak, adherenceCalendar, parseDayKey, takenAtFor,
 } from './medications'
 import { BarChart, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Cell } from 'recharts'
 import { readingsToCsv, downloadText, exportFilename } from './exporting'
@@ -1539,7 +1539,10 @@ function AdherenceCard({ label, result }) {
 }
 
 function MedicationPage({ medication, logs, onToggleDose }) {
-  const day = dayKey()
+  const today = dayKey()
+  // The day the dose buttons are for: today, or a past day picked on the calendar.
+  const [selectedDay, setSelectedDay] = useState(today)
+  const day = today
   const slots = slotsFor(medication.frequency)
   const stats = medicationStats(medication.id, logs)
   const week = adherence(medication, logs, 7, day)
@@ -1577,15 +1580,20 @@ function MedicationPage({ medication, logs, onToggleDose }) {
         <div className="adherence-calendar" role="grid" aria-label="Doses taken per day">
           {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i} className="cal-head">{d}</span>)}
           {calendar.map(cell => (
-            <span
+            <button
+              type="button"
               key={cell.day}
-              className={`cal-day cal-${cell.state}${cell.day === day ? ' cal-today' : ''}`}
+              className={`cal-day cal-${cell.state}${cell.day === day ? ' cal-today' : ''}${cell.day === selectedDay ? ' cal-selected' : ''}`}
               title={`${formatDayKey(cell.day)}: ${cell.state === 'future' || cell.state === 'before' ? '—' : `${cell.taken}/${cell.total} doses`}`}
+              disabled={cell.state === 'future'}
+              onClick={() => setSelectedDay(cell.day)}
+              aria-pressed={cell.day === selectedDay}
             >
               {parseDayKey(cell.day).getDate()}
-            </span>
+            </button>
           ))}
         </div>
+        <p className="builder-hint cal-hint">Tap a day to log or fix its doses.</p>
         <div className="cal-legend">
           <span><i className="cal-dot cal-complete" /> All doses</span>
           <span><i className="cal-dot cal-partial" /> Some</span>
@@ -1596,18 +1604,25 @@ function MedicationPage({ medication, logs, onToggleDose }) {
       <div className="card">
         <div className="card-title">
           <span className="dot" style={{ background: 'var(--accent-hover)' }} />
-          Have you taken today&apos;s {medication.name}?
+          {selectedDay === today
+            ? <>Have you taken today&apos;s {medication.name}?</>
+            : <>{medication.name} on {formatDayKey(selectedDay)}</>}
+          {selectedDay !== today && (
+            <button type="button" className="btn-chip card-title-action" onClick={() => setSelectedDay(today)}>
+              Back to today
+            </button>
+          )}
         </div>
         {detail && <p className="builder-hint med-detail">{detail}</p>}
         <div className="dose-buttons">
           {slots.map(slot => {
-            const log = logs[logKey(medication.id, day, slot.key)]
+            const log = logs[logKey(medication.id, selectedDay, slot.key)]
             return (
               <button
                 key={slot.key}
                 type="button"
                 className={`dose-btn ${log ? 'dose-taken' : ''}`}
-                onClick={() => onToggleDose(medication, day, slot.key, !!log)}
+                onClick={() => onToggleDose(medication, selectedDay, slot.key, !!log)}
               >
                 <span className="dose-check">{log ? '✓' : '+'}</span>
                 <span className="dose-name">{slot.label}</span>
@@ -2335,8 +2350,8 @@ function App() {
       await clearMedicationDose(user.uid, medication.id, day, slot)
       showToast(`${slotLabel(slot)} dose cleared`, 'error')
     } else {
-      await setMedicationDose(user.uid, medication.id, day, slot, new Date().toISOString())
-      showToast(`${slotLabel(slot)} dose logged`)
+      await setMedicationDose(user.uid, medication.id, day, slot, takenAtFor(day, slot))
+      showToast(day === dayKey() ? `${slotLabel(slot)} dose logged` : `${slotLabel(slot)} dose logged for ${formatDayKey(day)}`)
     }
   }
 

@@ -7,10 +7,19 @@
 export const MAX_MEDICATION_EXTRAS = 3
 
 export const SLOTS = [
-  { key: 'morning', label: 'Morning' },
-  { key: 'afternoon', label: 'Afternoon' },
-  { key: 'night', label: 'Night' },
+  { key: 'morning', label: 'Morning', hour: 8 },
+  { key: 'afternoon', label: 'Afternoon', hour: 14 },
+  { key: 'night', label: 'Night', hour: 21 },
 ]
+
+// When a dose logged now counts as taken: now for today, and the slot's usual
+// hour for a past day logged after the fact.
+export function takenAtFor(day, slot, now = new Date()) {
+  if (day === dayKey(now)) return now.toISOString()
+  const [y, m, d] = String(day).split('-').map(Number)
+  const hour = SLOTS.find(s => s.key === slot)?.hour ?? 12
+  return new Date(y, m - 1, d, hour).toISOString()
+}
 
 export const FREQUENCIES = [
   { value: 1, label: 'Once a day' },
