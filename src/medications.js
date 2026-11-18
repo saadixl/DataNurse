@@ -92,3 +92,85 @@ export function medicationStats(medicationId, logs) {
   })
   return { days: days.size, doses }
 }
+
+// ---------- Adherence ----------
+
+// 'YYYY-MM-DD' as a local Date at midnight.
+export function parseDayKey(day) {
+  const [y, m, d] = String(day).split('-').map(Number)
+  return new Date(y, m - 1, d)
+}
+
+export function addDays(day, n) {
+  const d = parseDayKey(day)
+  d.setDate(d.getDate() + n)
+  return dayKey(d)
+}
+
+// The first day a medication counts from: when it was added, or its earliest
+// logged dose if that is earlier (sample data, or doses logged for past days).
+export function medicationStartDay(medication, logs) {
+  let start = medication.createdAt ? dayKey(new Date(medication.createdAt)) : null
+  Object.values(logs).forEach(log => {
+    if (log.medicationId === medication.id && (!start || log.day < start)) start = log.day
+  })
+  return start || dayKey()
+}
+
+// How many of a day's scheduled doses are logged.
+export function dayProgress(medication, logs, day) {
+  return todayProgress(medication, logs, day)
+}
+
+/**
+ * Share of scheduled doses taken over the last `days` full days (today is
+ * left out until it's over, unless it is already complete), from the start day.
+ */
+export function adherence(medication, logs, days, today = dayKey()) {
+  const start = medicationStartDay(medication, logs)
+  const todayDone = progressState(dayProgress(medication, logs, today)) === 'complete'
+  let scheduled = 0
+  let taken = 0
+  for (let i = todayDone ? 0 : 1; i < days + (todayDone ? 0 : 1); i++) {
+    const day = addDays(today, -i)
+    if (day < start) break
+    const p = dayProgress(medication, logs, day)
+    scheduled += p.total
+    taken += p.taken
+  }
+  return { scheduled, taken, rate: scheduled ? taken / scheduled : null }
+}
+
+// Consecutive days with every dose taken, ending today (or yesterday while
+// today is still in progress).
+export function streak(medication, logs, today = dayKey()) {
+  const start = medicationStartDay(medication, logs)
+  let day = progressState(dayProgress(medication, logs, today)) === 'complete' ? today : addDays(today, -1)
+  let count = 0
+  while (day >= start && progressState(dayProgress(medication, logs, day)) === 'complete') {
+    count++
+    day = addDays(day, -1)
+  }
+  return count
+}
+
+/**
+ * The last `weeks` weeks as calendar cells, Monday first:
+ * [{ day, state: 'complete' | 'partial' | 'none' | 'future' | 'before', taken, total }].
+ */
+export function adherenceCalendar(medication, logs, weeks = 5, today = dayKey()) {
+  const start = medicationStartDay(medication, logs)
+  const todayDate = parseDayKey(today)
+  const mondayOffset = (todayDate.getDay() + 6) % 7
+  const first = addDays(today, -mondayOffset - (weeks - 1) * 7)
+  const cells = []
+  for (let i = 0; i < weeks * 7; i++) {
+    const day = addDays(first, i)
+    const p = dayProgress(medication, logs, day)
+    let state = progressState(p)
+    if (day > today) state = 'future'
+    else if (day < start) state = 'before'
+    cells.push({ day, state, taken: p.taken, total: p.total })
+  }
+  return cells
+}

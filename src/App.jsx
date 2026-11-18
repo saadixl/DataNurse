@@ -15,6 +15,7 @@ import {
 import {
   MAX_MEDICATION_EXTRAS, FREQUENCIES, MEAL_TIMINGS, slotsFor, slotLabel, mealLabel, frequencyLabel,
   dayKey, logKey, todayProgress, progressState, medicationStats,
+  adherence, streak, adherenceCalendar, parseDayKey,
 } from './medications'
 import { BarChart, ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend, ReferenceLine, Cell } from 'recharts'
 import { readingsToCsv, downloadText, exportFilename } from './exporting'
@@ -1523,10 +1524,28 @@ function MedicationsSettings({ medications, onCreate, onUpdate, onDelete, onTogg
   )
 }
 
+// Share of scheduled doses taken in a window.
+function AdherenceCard({ label, result }) {
+  const pct = result.rate === null ? null : Math.round(result.rate * 100)
+  const tone = pct === null ? '' : pct >= 90 ? 'adh-good' : pct >= 70 ? 'adh-ok' : 'adh-low'
+  return (
+    <div className={`stat-card ${tone}`}>
+      <div className="stat-label">{label}</div>
+      <div className="stat-value">{pct === null ? '—' : <>{pct}<span className="stat-unit">%</span></>}</div>
+      <div className="stat-sub">{result.scheduled ? `${result.taken} of ${result.scheduled} doses taken` : 'No full days yet'}</div>
+      {pct !== null && <div className="adh-bar"><span style={{ width: `${pct}%` }} /></div>}
+    </div>
+  )
+}
+
 function MedicationPage({ medication, logs, onToggleDose }) {
   const day = dayKey()
   const slots = slotsFor(medication.frequency)
   const stats = medicationStats(medication.id, logs)
+  const week = adherence(medication, logs, 7, day)
+  const month = adherence(medication, logs, 30, day)
+  const currentStreak = streak(medication, logs, day)
+  const calendar = useMemo(() => adherenceCalendar(medication, logs, 5, day), [medication, logs, day])
 
   const history = useMemo(() => Object.entries(logs)
     .filter(([, log]) => log.medicationId === medication.id)
@@ -1539,15 +1558,38 @@ function MedicationPage({ medication, logs, onToggleDose }) {
   return (
     <>
       <div className="stat-cards">
+        <AdherenceCard label="Last 7 days" result={week} />
+        <AdherenceCard label="Last 30 days" result={month} />
         <div className="stat-card">
-          <div className="stat-label">Days taking this</div>
-          <div className="stat-value">{stats.days}</div>
-          <div className="stat-sub">days with at least one dose</div>
+          <div className="stat-label">Streak</div>
+          <div className="stat-value">{currentStreak} <span className="stat-unit">{currentStreak === 1 ? 'day' : 'days'}</span></div>
+          <div className="stat-sub">in a row with every dose</div>
         </div>
         <div className="stat-card">
           <div className="stat-label">Doses taken</div>
           <div className="stat-value">{stats.doses}</div>
-          <div className="stat-sub">all time</div>
+          <div className="stat-sub">over {stats.days} {stats.days === 1 ? 'day' : 'days'}</div>
+        </div>
+      </div>
+
+      <div className="card adherence-calendar-card">
+        <div className="card-title">Last 5 weeks</div>
+        <div className="adherence-calendar" role="grid" aria-label="Doses taken per day">
+          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d, i) => <span key={i} className="cal-head">{d}</span>)}
+          {calendar.map(cell => (
+            <span
+              key={cell.day}
+              className={`cal-day cal-${cell.state}${cell.day === day ? ' cal-today' : ''}`}
+              title={`${formatDayKey(cell.day)}: ${cell.state === 'future' || cell.state === 'before' ? '—' : `${cell.taken}/${cell.total} doses`}`}
+            >
+              {parseDayKey(cell.day).getDate()}
+            </span>
+          ))}
+        </div>
+        <div className="cal-legend">
+          <span><i className="cal-dot cal-complete" /> All doses</span>
+          <span><i className="cal-dot cal-partial" /> Some</span>
+          <span><i className="cal-dot cal-none" /> Missed</span>
         </div>
       </div>
 
