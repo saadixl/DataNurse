@@ -2837,3 +2837,103 @@ button.cal-day:disabled {
     padding-top: calc(16px + env(safe-area-inset-top, 0px));
   }
 }
+
+/* ---------- Quick add ---------- */
+.section-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 10px;
+}
+
+.section-row .section-title {
+  margin: 0;
+}
+
+.btn-add-reading {
+  position: relative;
+  overflow: hidden;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 999px;
+  color: #fff;
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--accent-gradient);
+  box-shadow: 0 8px 24px -10px rgba(139, 92, 246, 0.9), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  transition: transform 0.2s var(--ease), box-shadow 0.25s var(--ease);
+}
+
+.btn-add-reading span {
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.btn-add-reading:hover {
+  box-shadow: 0 12px 30px -10px rgba(139, 92, 246, 1), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-add-reading:active {
+  transform: scale(0.97);
+}
+
+.quick-add {
+  max-width: 560px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+}
+
+.quick-add-types {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.type-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface-2);
+  color: var(--text-2);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+}
+
+.type-chip:hover {
+  color: var(--text);
+  border-color: var(--line-strong);
+}
+
+.type-chip.active {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--chip-color) 55%, transparent);
+  background: color-mix(in srgb, var(--chip-color) 16%, transparent);
+}
+
+/* The reading form sits flat inside the dialog */
+.quick-add .card {
+  margin: 0;
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.quick-add .card-title {
+  display: none;
+}

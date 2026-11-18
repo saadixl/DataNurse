@@ -177,6 +177,55 @@ function ReadingForm({ definition, onAdd }) {
   )
 }
 
+// Add a reading of any type without opening its page first.
+function QuickAddModal({ definitions, onAdd, onClose }) {
+  const [typeId, setTypeId] = useState(definitions[0]?.id)
+  const definition = definitions.find(d => d.id === typeId) || definitions[0]
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content quick-add" onClick={e => e.stopPropagation()} role="dialog" aria-label="Add a reading">
+        <div className="modal-header">
+          <h3>Add a reading</h3>
+          <button className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
+        </div>
+        <div className="quick-add-types" role="radiogroup" aria-label="Reading type">
+          {definitions.map(d => (
+            <button
+              key={d.id}
+              type="button"
+              role="radio"
+              aria-checked={d.id === definition?.id}
+              className={`type-chip${d.id === definition?.id ? ' active' : ''}`}
+              style={{ '--chip-color': d.color || 'var(--accent)' }}
+              onClick={() => setTypeId(d.id)}
+            >
+              <span className="dot" style={{ background: d.color || 'var(--accent)' }} />
+              {d.name}
+            </button>
+          ))}
+        </div>
+        {definition && (
+          <ReadingForm
+            key={definition.id}
+            definition={definition}
+            onAdd={async (reading) => {
+              await onAdd(reading)
+              onClose()
+            }}
+          />
+        )}
+      </div>
+    </div>
+  )
+}
+
 function EditReadingModal({ reading, definition, onSave, onClose }) {
   const [values, setValues] = useState(() => Object.fromEntries(
     (definition?.fields || []).map(f => [f.key, getFieldValue(reading, definition, f) ?? ''])
@@ -2238,6 +2287,7 @@ function App() {
   const enabledDefinitions = useMemo(() => definitions.filter(d => d.enabled), [definitions])
   const enabledMedications = useMemo(() => medications.filter(m => m.enabled), [medications])
 
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
   const [reminderSettings, setReminderSettings] = useState(loadReminderSettings)
   const changeReminderSettings = useCallback((next) => {
     setReminderSettings(next)
@@ -2453,6 +2503,13 @@ function App() {
   return (
     <div className="app-shell">
       <Toast toasts={toasts} onDismiss={dismissToast} />
+      {quickAddOpen && (
+        <QuickAddModal
+          definitions={enabledDefinitions}
+          onAdd={handleAddReading}
+          onClose={() => setQuickAddOpen(false)}
+        />
+      )}
       {editingReading && (
         <EditReadingModal
           reading={editingReading}
@@ -2590,7 +2647,14 @@ function App() {
             )}
 
             {enabledMedications.length === 0 && <PageHeader eyebrow="Overview" title="Your health" />}
-            <h3 className="section-title">Readings</h3>
+            <div className="section-row">
+              <h3 className="section-title">Readings</h3>
+              {enabledDefinitions.length > 0 && (
+                <button type="button" className="btn-add-reading" onClick={() => setQuickAddOpen(true)}>
+                  <span aria-hidden="true">+</span> Add reading
+                </button>
+              )}
+            </div>
 
             {dataLoading ? (
               <>
