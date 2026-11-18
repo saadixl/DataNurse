@@ -1837,26 +1837,40 @@ function MenuIcon() {
   )
 }
 
-function Toast({ toasts }) {
+function Toast({ toasts, onDismiss }) {
   return (
     <div className="toast-container">
       {toasts.map(t => (
-        <div key={t.id} className={`toast toast-${t.type || 'success'}`}>
-          {t.message}
+        <div key={t.id} className={`toast toast-${t.type || 'success'}${t.action ? ' toast-with-action' : ''}`}>
+          <span>{t.message}</span>
+          {t.action && (
+            <button
+              type="button"
+              className="toast-action"
+              onClick={() => {
+                t.action.onClick()
+                onDismiss(t.id)
+              }}
+            >
+              {t.action.label}
+            </button>
+          )}
         </div>
       ))}
     </div>
   )
 }
 
+// A toast with an action (e.g. Undo) stays longer, so there's time to use it.
 function useToast() {
   const [toasts, setToasts] = useState([])
-  const show = useCallback((message, type = 'success') => {
-    const id = Date.now()
-    setToasts(prev => [...prev, { id, message, type }])
-    setTimeout(() => setToasts(prev => prev.filter(t => t.id !== id)), 3000)
-  }, [])
-  return { toasts, show }
+  const dismiss = useCallback((id) => setToasts(prev => prev.filter(t => t.id !== id)), [])
+  const show = useCallback((message, type = 'success', action = null) => {
+    const id = Date.now() + Math.random()
+    setToasts(prev => [...prev, { id, message, type, action }])
+    setTimeout(() => dismiss(id), action ? 6000 : 3000)
+  }, [dismiss])
+  return { toasts, show, dismiss }
 }
 
 function BrandMark({ size = 32 }) {
@@ -1961,7 +1975,7 @@ function App() {
   const [dataLoading, setDataLoading] = useState(true)
   const [editingReading, setEditingReading] = useState(null)
   const [formCollapsed, setFormCollapsed] = useState(false)
-  const { toasts, show: showToast } = useToast()
+  const { toasts, show: showToast, dismiss: dismissToast } = useToast()
   const [menuOpen, setMenuOpen] = useState(false)
   const seedingRef = useRef(false)
 
@@ -2119,8 +2133,17 @@ function App() {
   }
 
   async function handleDeleteReading(id) {
+    const removed = readings.find(r => r.id === id)
     await deleteReading(user.uid, id)
-    showToast('Reading deleted')
+    showToast('Reading deleted', 'success', removed && {
+      label: 'Undo',
+      onClick: () => {
+        const { id: readingId, ...data } = removed
+        updateReading(user.uid, readingId, data)
+          .then(() => showToast('Reading restored'))
+          .catch(() => showToast('Couldn’t restore the reading', 'error'))
+      },
+    })
   }
 
   async function handleCreateDefinition({ name, fields }) {
@@ -2225,7 +2248,7 @@ function App() {
 
   return (
     <div className="app-shell">
-      <Toast toasts={toasts} />
+      <Toast toasts={toasts} onDismiss={dismissToast} />
       {editingReading && (
         <EditReadingModal
           reading={editingReading}
