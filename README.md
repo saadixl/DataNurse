@@ -12,3 +12,11 @@ DataNurse is a personal health monitoring app. Rather than shipping a fixed set 
 <img width="1512" height="859" alt="Screenshot 2026-08-21 at 8 55 36 PM" src="https://github.com/user-attachments/assets/6266fdaf-e10e-4de3-991b-5c343b12caf1" />
 
 <img width="1512" height="861" alt="Screenshot 2026-08-21 at 8 55 42 PM" src="https://github.com/user-attachments/assets/b16ae2fd-36cf-4c49-80f4-fe0ec6f7ef64" />
+
+## Setup
+
+```bash
+npm install
+cp .env.example .env.local   # then fill in your Firebase web app config
+npm run dev
+```

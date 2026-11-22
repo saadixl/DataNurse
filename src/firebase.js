@@ -4,19 +4,28 @@ import { getDatabase, ref, push, remove, set, update, get, onValue, query, order
 import { GLOBAL_DEFINITIONS, normalizeDefinition } from "./definitions"
 import { normalizeMedication, logKey, slotsFor, dayKey } from "./medications"
 
+// Project config comes from .env.local (git-ignored); see .env.example for the keys.
+// These values still ship in the built JS that browsers download; access is enforced by
+// database.rules.json, Firebase Auth's authorized domains and the API key's referrer limits.
+const env = import.meta.env
 const firebaseConfig = {
-  apiKey: "REDACTED_API_KEY",
+  apiKey: env.VITE_FIREBASE_API_KEY,
   // Must be a domain the app itself is served from (not the default
   // firebaseapp.com one). Mobile Safari/Chrome block the cross-site storage
   // signInWithRedirect needs, so a mismatched authDomain makes redirect
   // sign-in silently fail and drop back to the login screen.
-  authDomain: "datanurse.saadixl.com",
-  projectId: "datanurse-app",
-  storageBucket: "datanurse-app.firebasestorage.app",
-  messagingSenderId: "REDACTED_SENDER_ID",
-  appId: "REDACTED_APP_ID",
-  measurementId: "REDACTED_MEASUREMENT_ID",
-  databaseURL: "https://datanurse-app-default-rtdb.firebaseio.com"
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: env.VITE_FIREBASE_APP_ID,
+  measurementId: env.VITE_FIREBASE_MEASUREMENT_ID,
+  databaseURL: env.VITE_FIREBASE_DATABASE_URL
+}
+
+const missingConfig = Object.keys(firebaseConfig).filter(k => !firebaseConfig[k] && k !== 'measurementId')
+if (missingConfig.length) {
+  throw new Error(`Missing Firebase config: ${missingConfig.join(', ')}. Copy .env.example to .env.local and fill it in.`)
 }
 
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig)
